@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -77,6 +78,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .q-hand-cards .card{width:43px;height:64px;font-size:12px}
 .q-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .q-help{color:#d7eeee;font-size:13px}
+.fourstop-bubble{position:fixed;left:50%;top:24%;transform:translate(-50%,18px) scale(.75);opacity:0;pointer-events:none;z-index:2000;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:22px;padding:16px 25px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}
+.fourstop-bubble::after{content:"";position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);border-width:17px 14px 0;border-style:solid;border-color:#ffbd45 transparent transparent}
+.fourstop-bubble.show{animation:fourstop-pop 1.8s ease both}
+@keyframes fourstop-pop{0%{opacity:0;transform:translate(-50%,18px) scale(.65)}12%{opacity:1;transform:translate(-50%,0) scale(1.08)}22%{transform:translate(-50%,0) scale(1)}78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-18px) scale(.9)}}
 @media(max-width:900px){.layout{grid-template-columns:1fr}.rules{order:2}.players{grid-template-columns:repeat(3,minmax(0,1fr))}.rules table{font-size:12px}}
 @media(max-width:500px){header{padding:10px}.layout{padding:0 8px 12px}.players{gap:5px}.player{padding:7px 3px;font-size:12px}.card{width:44px;height:68px;padding:4px}.card .big{font-size:21px}.hand{gap:2px}.center{gap:10px}.pile{width:90px}}
 </style>
@@ -204,6 +209,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </div>
 </div>
 
+<div id="fourStopBubble" class="fourstop-bubble" aria-live="polite">止め価値あり！</div>
 <script>
 const SUITS=['♠','♥','♦','♣'];
 const RANKS=[3,4,5,6,7,8,9,10,11,12,13,14,15];
@@ -280,6 +286,14 @@ function log(s){
  d.textContent=s;
  el.prepend(d);
  while(el.children.length>25)el.lastChild.remove();
+}
+
+function showFourStopBubble(){
+ const bubble=document.getElementById('fourStopBubble');
+ if(!bubble)return;
+ bubble.classList.remove('show');
+ void bubble.offsetWidth;
+ bubble.classList.add('show');
 }
 
 function current(){return state.players[state.turn]}
@@ -403,10 +417,13 @@ function canBeat(cards){
  if(state.eightCutPending&&state.table.some(c=>c.rank===8))return isFourStopPair(cards);
 
  if(cards.length!==state.table.length)return false;
- // 縛り中でもジョーカーは出せる。ジョーカー以外のカードだけマークを確認する。
- if(state.lockSuit&&cards.some(c=>c.rank!==16&&c.suit!==state.lockSuit))return false;
+ // ジョーカーは縛りに関係なく出せる。
+ // 場にジョーカーがあり、場に9が含まれていなければ♠3返しができる。
+ if(state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&
+    cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;
 
- if(state.table.some(c=>c.rank===16)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;
+ // ジョーカーを含む出し方は縛りを無視する。それ以外は縛りに従う。
+ if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
 
  if(cards.length>1&&!cards.every(c=>c.rank===cards[0].rank)){
   return cards[0].rank>state.table[0].rank;
@@ -486,7 +503,7 @@ function playCards(cards,byCpu=false){
 
  const wasFirstMove=state.firstMove;
  const fourStop=state.eightCutPending&&state.table.some(c=>c.rank===8)&&isFourStopPair(cards);
- const spadeThreeReversal=state.table.length===1&&state.table[0].rank===16&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠';
+ const spadeThreeReversal=state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠';
  const oldTable=state.table.slice();
 
  // この場が流れるまでに出されたカードを履歴として保存する
@@ -529,7 +546,8 @@ function playCards(cards,byCpu=false){
  // 4は単独で場を流さない。指定された4止めの条件でのみ流す
  if(fourStop){
   state.effects.push('4止め');
-  log('4止め！場を流し、'+p.name+'から再開します。');
+  log('止め価値あり！ '+p.name+'が4止め！場を流し、'+p.name+'から再開します。');
+  showFourStopBubble();
   if(finishIfNeeded(p)){render();return true}
   clearTrick(state.turn);
   render();
@@ -553,8 +571,10 @@ function playCards(cards,byCpu=false){
 
   // 8は一度場に残し、次の人が4止めできる機会を作る
   if(cards.some(c=>c.rank===8)){
-   state.effects.push('8切り');
+   const eightCount=cards.filter(c=>c.rank===8).length;
+   state.effects.push('8切り（'+eightCount+'枚）');
    state.eightCutPending=true;
+   log('8切り：8を'+eightCount+'枚出しました。4止めがなければ場を流します。');
   }
 
   if(cards.some(c=>c.rank===9)){
@@ -987,7 +1007,7 @@ function cpuTurn(){
   let options=[];
 
   // 場がジョーカー1枚だけでCPUが♠3を持っている場合、必ず♠3で上書きし、CPU自身から再開。
-  if(state.table.length===1&&state.table[0].rank===16){
+  if(state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)){
    const spadeThree=p.hand.find(c=>c.rank===3&&c.suit==='♠');
    if(spadeThree&&canBeat([spadeThree])){
     playCards([spadeThree],true);
@@ -1015,9 +1035,10 @@ function cpuTurn(){
   let byRank={};
   p.hand.forEach(c=>(byRank[c.rank]??=[]).push(c));
   for(let arr of Object.values(byRank)){
-   if(arr.length>=2){
-    let pair=arr.slice(0,2);
-    if(canBeat(pair))options.push(pair);
+   // ペアだけでなく、同じ数字の3枚・4枚出しもCPU候補にする。
+   for(let size=2;size<=Math.min(arr.length,4);size++){
+    const group=arr.slice(0,size);
+    if(canBeat(group))options.push(group);
    }
   }
 
@@ -1033,7 +1054,16 @@ function cpuTurn(){
    }
   }
 
-  options.sort((a,b)=>a.length-b.length||rankPower(a[0].rank)-rankPower(b[0].rank));
+  // 7・8・10・Qは複数枚を出せるなら優先し、効果をカード枚数分処理する。
+   // これをしないと「単独カード優先」の並び替えでCPUがペアをほぼ出さなかった。
+   const effectRanks=[7,8,10,12];
+   options.sort((a,b)=>{
+    const aEffect=a.length>1&&a.every(c=>c.rank===a[0].rank)&&effectRanks.includes(a[0].rank)?1:0;
+    const bEffect=b.length>1&&b.every(c=>c.rank===b[0].rank)&&effectRanks.includes(b[0].rank)?1:0;
+    if(aEffect!==bEffect)return bEffect-aEffect;
+    if(aEffect&&bEffect&&a.length!==b.length)return b.length-a.length;
+    return a.length-b.length||rankPower(a[0].rank)-rankPower(b[0].rank);
+   });
 
   if(!options.length){
    pass(true);
@@ -1043,10 +1073,7 @@ function cpuTurn(){
   playCards(options[0],true);
   render();
 
-  if(!state.finished&&state.turn!==0){
-   setTimeout(()=>{if(!state.finished&&state.turn!==0)cpuTurn()},2000);
-  }
- },650);
+ },4000);
 }
 
 document.getElementById('playBtn').onclick=()=>{
@@ -1145,4 +1172,4 @@ document.addEventListener('keydown',e=>{
 newGame();
 </script>
 </body>
-</html>
+</html>これ縛り中でもジョーカーを出せるようにして　コードは基本変えず修正箇所だけ。終わったら全文ここに書いて
