@@ -17,7 +17,7 @@ function publicPlayers(room){return room.players.map(p=>({name:p.name,isCPU:fals
 function addLog(g,msg){g.logs.push(msg); if(g.logs.length>35)g.logs.shift();}
 function active(i,g){return !!g.players[i] && !g.players[i].finished && g.players[i].hand.length>0;}
 function nextActive(from,g,steps=1){let i=from; for(let n=0;n<steps;n++){let found=-1; for(let s=1;s<=g.players.length;s++){const j=(i+s)%g.players.length;if(active(j,g)){found=j;break;}} if(found<0)return -1; i=found;} return i;}
-function clearTrick(g,start){g.table=[];g.lastCards=[];g.lastPlayer=-1;g.passCount=0;g.lockSuit=null;g.eightPending=false;g.downBase=null;g.effects=[];g.neutralizeCount=0;g.jBackNineLock=false;g.trickHistory=[];g.turn=active(start,g)?start:nextActive(start,g); if(g.turn<0)g.finished=true; addLog(g,`場が流れました。${g.players[g.turn]?.name || ''}から再開。`);}
+function clearTrick(g,start){g.table=[];g.lastCards=[];g.lastPlayer=-1;g.passCount=0;g.lockSuit=null;g.eightPending=false;g.downBase=null;g.effects=[];g.neutralizeCount=0;g.jBack=false;g.jBackNineLock=false;g.trickHistory=[];g.turn=active(start,g)?start:nextActive(start,g); if(g.turn<0)g.finished=true; addLog(g,`場が流れました。${g.players[g.turn]?.name || ''}から再開。Jバックをリセットしました。`);}
 function validSet(cards){if(!cards.length)return false;const jokers=cards.filter(c=>c.rank===16),normal=cards.filter(c=>c.rank!==16);if(cards.length===1)return true;if(normal.length&&normal.every(c=>c.rank===normal[0].rank))return cards.length<=4&&jokers.length<=2;if(!normal.length)return cards.length<=2;if(jokers.length<1||jokers.length>2||normal.length<2||!normal.every(c=>c.suit===normal[0].suit))return false;const ranks=normal.map(c=>c.rank).sort((a,b)=>a-b);return new Set(ranks).size===ranks.length&&(Math.max(...ranks)-Math.min(...ranks)<cards.length)&&cards.length<=13;}
 function isJBackDownStep(previous,next,g){const order=[11,12,13,14,15];return !!(g.jBack&&previous&&next&&previous.rank!==16&&next.rank!==16&&previous.suit===next.suit&&order.indexOf(next.rank)===order.indexOf(previous.rank)+1&&order.includes(previous.rank));}
 function canBeat(cards,g){if(!validSet(cards))return false;if(g.firstMove)return cards.length===1&&cards[0].rank===3&&cards[0].suit==='♦';if(!g.table.length)return true;if(g.table.length===1&&cards.length===1&&cards[0].rank===16)return true;if(g.eightPending&&g.table.some(c=>c.rank===8))return cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));if(cards.length!==g.table.length)return false;if(!g.jBackNineLock&&g.table.some(c=>c.rank===16)&&!g.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;if(g.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==g.lockSuit))return false;if(g.downBase!==null&&cards.length===1&&g.table.length===1&&cards[0].rank!==16&&g.table[0].rank!==16){return (cards[0].suit===g.table[0].suit&&(cards[0].rank===g.table[0].rank-1||isJBackDownStep(g.table[0],cards[0],g)))||cards[0].rank>g.downBase;}if(g.table.length===1&&cards.length===1&&cards[0].rank!==16&&g.table[0].rank!==16&&cards[0].suit===g.table[0].suit&&(cards[0].rank===g.table[0].rank-1||isJBackDownStep(g.table[0],cards[0],g)))return true;const top=g.table[0].rank;return power(cards[0].rank,g)>power(top,g);}
@@ -54,21 +54,23 @@ function runNextPendingAction(code){
  const skip=g.pendingSkip||0;g.pendingSkip=0;g.pendingActor=-1;
  advanceAfterPlay(code,actorIndex,skip);
 }
-function applyOnlineChoice(code,playerId,ids){
- const room=rooms.get(code),g=room?.game,choice=g?.pendingChoice;if(!g||!choice)return;
- const actor=g.players[choice.actor];if(!actor||actor.id!==playerId)return;
+function applyOnlineChoice(code,playerId,ids,expectedType=null){
+ const room=rooms.get(code),g=room?.game,choice=g?.pendingChoice;if(!g||!choice)return {ok:false,message:'カード選択中ではありません。'};
+ const actor=g.players[choice.actor];if(!actor||actor.id!==playerId)return {ok:false,message:'カードを選択できるプレイヤーではありません。'};
+ if(expectedType&&choice.type!==expectedType)return {ok:false,message:expectedType==='give'?'現在は「相手に渡す」処理ではありません。':'現在は「カードを捨てる」処理ではありません。'};
  const wanted=new Set(Array.isArray(ids)?ids:[]);const cards=actor.hand.filter(c=>wanted.has(c.id));
  const need=Math.min(choice.remaining,actor.hand.length);
- if(cards.length!==wanted.size||cards.length!==need){io.to(playerId).emit('onlineActionError',`カードを${need}枚選択してください。`);return;}
+ if(cards.length!==wanted.size||cards.length!==need){return {ok:false,message:`カードを${need}枚選択してください。`};}
+ if(choice.type==='give'&&!g.players[choice.recipient])return {ok:false,message:'渡す相手が見つかりません。'};
  actor.hand=actor.hand.filter(c=>!wanted.has(c.id));
  if(choice.type==='give'){
-  const recipient=g.players[choice.recipient];
-  if(recipient){recipient.hand.push(...cards);addLog(g,`${actor.name}が7渡しで${recipient.name}に${cards.map(cardText).join('・')}を渡した。`);}
+  const recipient=g.players[choice.recipient];recipient.hand.push(...cards);recipient.hand.sort((a,b)=>a.rank-b.rank||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit));addLog(g,`${actor.name}が7渡しで${recipient.name}に${cards.map(cardText).join('・')}を渡した。`);
  }else{
   addLog(g,`${actor.name}が10捨てで${cards.map(cardText).join('・')}を捨てた。`);
  }
  g.pendingChoice=null;
  runNextPendingAction(code);
+ return {ok:true};
 }
 function doPlay(code,playerId,ids){
  const room=rooms.get(code),g=room?.game;if(!g||g.finished||g.pendingQ||g.pendingChoice)return;
@@ -115,7 +117,10 @@ io.on('connection',socket=>{
  socket.on('startOnlineGame',(_payload,cb)=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return cb?.({ok:false,message:'先にルームへ参加してください。'});if(room.hostId!==socket.id)return cb?.({ok:false,message:'ゲーム開始はルーム作成者のみ実行できます。'});if(room.game&&!room.game.finished)return cb?.({ok:false,message:'ゲームはすでに進行中です。'});if(room.players.length!==room.maxPlayers)return cb?.({ok:false,message:`参加人数が足りません（${room.players.length}/${room.maxPlayers}人）。`});startGame(code);cb?.({ok:true});});
  socket.on('onlinePlay',(payload={},cb)=>{const code=socket.data.roomCode;if(!code)return cb?.({ok:false,message:'ルームに参加していません。'});doPlay(code,socket.id,payload.cardIds||[]);cb?.({ok:true});});
  socket.on('onlinePass',(_payload,cb)=>{const code=socket.data.roomCode;if(!code)return cb?.({ok:false,message:'ルームに参加していません。'});doPass(code,socket.id);cb?.({ok:true});});
- socket.on('onlineChooseCards',(payload={},cb)=>{const code=socket.data.roomCode;if(!code)return cb?.({ok:false,message:'ルームに参加していません。'});const room=rooms.get(code),g=room?.game;if(!g?.pendingChoice||g.players[g.pendingChoice.actor]?.id!==socket.id)return cb?.({ok:false,message:'カード選択中ではありません。'});applyOnlineChoice(code,socket.id,payload.cardIds||[]);cb?.({ok:true});});
+ const handleChoiceCommand=(expectedType,payload={},cb)=>{const code=socket.data.roomCode;if(!code)return cb?.({ok:false,message:'ルームに参加していません。'});const room=rooms.get(code),g=room?.game;if(!g?.pendingChoice||g.players[g.pendingChoice.actor]?.id!==socket.id)return cb?.({ok:false,message:'カード選択中ではありません。'});const result=applyOnlineChoice(code,socket.id,payload.cardIds||[],expectedType);cb?.(result);};
+ socket.on('onlineChooseCards',(payload={},cb)=>handleChoiceCommand(null,payload,cb));
+ socket.on('onlineGiveCards',(payload={},cb)=>handleChoiceCommand('give',payload,cb));
+ socket.on('onlineDiscardCards',(payload={},cb)=>handleChoiceCommand('discard',payload,cb));
  socket.on('onlineQSelect',(payload={},cb)=>{const code=socket.data.roomCode,room=rooms.get(code),g=room?.game;if(!g||!g.pendingQ||g.players[g.pendingQ.actor]?.id!==socket.id)return cb?.({ok:false,message:'Qボンバーの選択状態ではありません。'});const rank=Number(payload.rank);if(!RANKS.includes(rank)&&rank!==16)return cb?.({ok:false,message:'数字を選択してください。'});applyQ(code,rank);cb?.({ok:true});});
  socket.on('leaveRoom',cb=>{leaveRoom(socket);cb?.({ok:true});});socket.on('disconnect',()=>leaveRoom(socket));
 });
