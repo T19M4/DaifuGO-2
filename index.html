@@ -99,6 +99,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @keyframes revolution-spin{from{transform:rotate(0deg) scale(.7)}to{transform:rotate(540deg) scale(1.2)}}
 @media(max-width:900px){.layout{grid-template-columns:1fr}.rules{order:2}.players{grid-template-columns:repeat(3,minmax(0,1fr))}.rules table{font-size:12px}}
 @media(max-width:500px){header{padding:10px}.layout{padding:0 8px 12px}.players{gap:5px}.player{padding:7px 3px;font-size:12px}.card{width:44px;height:68px;padding:4px}.card .big{font-size:21px}.hand{gap:2px}.center{gap:10px}.pile{width:90px}}
+
+.online-modal{position:fixed;inset:0;background:#001a16e8;display:none;align-items:center;justify-content:center;padding:14px;z-index:3000}
+.online-modal.open{display:flex}.online-box{width:min(520px,100%);background:#07382e;border:2px solid #ffd85a;border-radius:16px;padding:20px;box-shadow:0 12px 40px #0009}
+.online-box input{width:100%;padding:11px;border-radius:8px;border:1px solid #70a9a0;margin:5px 0 12px;font-size:16px}
+.online-actions{display:flex;gap:8px;flex-wrap:wrap}.online-actions button{flex:1;min-width:130px}
+#onlinePlayers{padding-left:20px;line-height:1.8}.online-code{font-size:24px;letter-spacing:3px;color:#ffdf71;font-weight:900}
+
 </style>
 </head>
 <body>
@@ -229,6 +236,29 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div id="fourStopBubble" class="fourstop-bubble" aria-live="polite">止め価値あり！</div>
 <div id="jjBubble" class="jj-bubble" aria-live="polite">おJJスターバックスバックス！？</div>
 <div id="revolutionOverlay" class="revolution-overlay" aria-hidden="true"><div class="revolution-rays"></div><div class="revolution-title" id="revolutionTitle">革命！！</div></div>
+
+<div class="online-modal" id="onlineModal" role="dialog" aria-modal="true" aria-labelledby="onlineTitle">
+ <div class="online-box">
+  <h2 id="onlineTitle">オンラインルーム</h2>
+  <p class="subtle">名前は最大6文字。ルームコードを友達に共有してください。</p>
+  <label for="onlineName">プレイヤー名</label>
+  <input id="onlineName" maxlength="6" autocomplete="nickname" placeholder="名前（最大6文字）">
+  <label for="onlineRoomCode">参加コード（参加する場合）</label>
+  <input id="onlineRoomCode" maxlength="6" autocomplete="off" placeholder="例：A1B2C3">
+  <div class="online-actions">
+   <button id="createOnlineRoom">ルームを作成</button>
+   <button id="joinOnlineRoom">コードで参加</button>
+  </div>
+  <div id="onlineLobby" style="display:none;margin-top:16px">
+   <p>ルームコード：<span class="online-code" id="onlineRoomCodeView"></span></p>
+   <p>参加者（最大4人）</p><ol id="onlinePlayers"></ol>
+   <p class="subtle" id="onlineLobbyStatus">参加者を待っています。</p>
+  </div>
+  <p id="onlineError" role="status" style="color:#ffb6a9;min-height:24px"></p>
+  <div class="online-actions"><button id="closeOnlineModal" style="background:#244753">閉じる</button></div>
+ </div>
+</div>
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 <script>
 const SUITS=['♠','♥','♦','♣'];
 const RANKS=[3,4,5,6,7,8,9,10,11,12,13,14,15];
@@ -1337,8 +1367,8 @@ let selectedMode='offline';
 
  document.getElementById('onlineMode').onclick=()=>{
   selectedMode='online';
-  alert('オンラインモードは今後追加予定です。現在はオフラインモードで遊べます。');
-  selectedMode='offline';
+  document.querySelector('h1 span').textContent='～オンラインルーム～';
+  openOnlineModal();
  };
 
 document.getElementById('newGame').onclick=()=>{
@@ -1406,6 +1436,70 @@ document.addEventListener('keydown',e=>{
   fieldModal.classList.remove('open');
  }
 });
+
+
+// オンラインルーム接続（この段階ではルーム作成・参加・参加者一覧を実装）
+const ONLINE_SERVER_URL = 'https://daifugo-2.onrender.com';
+let onlineSocket = null;
+let onlineRoomCode = null;
+let onlineIsHost = false;
+function openOnlineModal(){
+ const modal=document.getElementById('onlineModal');
+ modal.classList.add('open');
+ document.getElementById('onlineError').textContent='';
+ if(!onlineSocket){
+  if(typeof io!=='function'){
+   document.getElementById('onlineError').textContent='通信ライブラリを読み込めません。ページを再読み込みしてください。';
+   return;
+  }
+  onlineSocket=io(ONLINE_SERVER_URL,{transports:['websocket','polling']});
+  onlineSocket.on('connect_error',()=>{document.getElementById('onlineError').textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
+  onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
+  onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。'; resetOnlineLobby();});
+ }
+}
+function renderOnlinePlayers(players){
+ const list=document.getElementById('onlinePlayers'); list.innerHTML='';
+ (players||[]).forEach(p=>{const li=document.createElement('li');li.textContent=p.name+(p.isCPU?'（CPU）':'');list.appendChild(li);});
+ document.getElementById('onlineLobbyStatus').textContent=(players||[]).length+'/4 人が参加中。CPU補充を含む対戦開始処理は次の統合段階で接続します。';
+}
+function resetOnlineLobby(){
+ onlineRoomCode=null; onlineIsHost=false;
+ document.getElementById('onlineLobby').style.display='none';
+}
+function onlineRequest(eventName,payload){
+ const error=document.getElementById('onlineError'); error.textContent='';
+ if(!onlineSocket){openOnlineModal();}
+ if(!onlineSocket)return;
+ if(!onlineSocket.connected){error.textContent='サーバーへ接続中です。少し待ってからもう一度試してください。';return;}
+ onlineSocket.emit(eventName,payload,result=>{
+  if(!result||!result.ok){error.textContent=result?.message||'処理に失敗しました。';return;}
+  onlineRoomCode=result.roomCode; onlineIsHost=!!result.isHost;
+  document.getElementById('onlineRoomCodeView').textContent=result.roomCode;
+  document.getElementById('onlineLobby').style.display='block';
+  renderOnlinePlayers(result.players||[]);
+ });
+}
+document.getElementById('createOnlineRoom').addEventListener('click',()=>{
+ const name=document.getElementById('onlineName').value.trim().slice(0,6);
+ if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}
+ onlineRequest('createRoom',{name});
+});
+document.getElementById('joinOnlineRoom').addEventListener('click',()=>{
+ const name=document.getElementById('onlineName').value.trim().slice(0,6);
+ const roomCode=document.getElementById('onlineRoomCode').value.trim().toUpperCase();
+ if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}
+ if(!roomCode){document.getElementById('onlineError').textContent='参加コードを入力してください。';return;}
+ onlineRequest('joinRoom',{name,roomCode});
+});
+document.getElementById('closeOnlineModal').addEventListener('click',()=>{
+ document.getElementById('onlineModal').classList.remove('open');
+ if(selectedMode==='online'){
+  selectedMode='offline';
+  document.querySelector('h1 span').textContent='～オフラインモード～';
+ }
+});
+document.getElementById('onlineModal').addEventListener('click',e=>{if(e.target.id==='onlineModal')document.getElementById('onlineModal').classList.remove('open');});
 
 newGame();
 </script>
