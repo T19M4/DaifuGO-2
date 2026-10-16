@@ -370,9 +370,7 @@ const rankPower=r=>{
 };
 const cardText=c=>c.rank===16?'JOKER':rankName(c.rank)+c.suit;
 
-// Jバック中のダウンナンバー特例：J→Q→K→A→2を同じマークでつなげる。
-const JBACK_DOWN_ORDER=[11,12,13,14,15];
-const isJBackDownStep=(previous,next)=>!!(state&&state.jBack&&previous&&next&&previous.rank!==16&&next.rank!==16&&previous.suit===next.suit&&JBACK_DOWN_ORDER.indexOf(next.rank)===JBACK_DOWN_ORDER.indexOf(previous.rank)+1&&JBACK_DOWN_ORDER.includes(previous.rank));
+// ダウンナンバーはJバック中も通常の数字順で、同じスートの前後1つを出せる。
 
 const cardEl=(c,extra='')=>{
  let d=document.createElement('div');
@@ -414,7 +412,7 @@ function newGame(){
 
  state={
   players,turn:start,deck:[],table:[],trickCards:[],lastCards:[],lastPlayer:-1,
-  passCount:0,selected:new Set(),jBack:false,jBackNineLock:false,downNumberJBackSequence:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
+  passCount:0,selected:new Set(),jBack:false,jBackNineLock:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
   finished:false,finishOrder:[],pendingQ:false,turnSerial:0,
   firstMove:true,eightCutPending:false,pendingDiscardCount:0,downNumberBaseRank:null
  };
@@ -612,7 +610,7 @@ function canBeat(cards){
  // ジョーカーを含む出し方は縛りを無視する。それ以外は縛りに従う。
  if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
 
- // ダウンナンバー中は、同じスートの前後1つの数字を出せる。
+ // ダウンナンバー中はJバックの状態に関係なく、同じスートの前後1つの数字を出せる。
  if(state.downNumberBaseRank!==null){
   if(cards.length!==1 || cards[0].rank===16 || state.table.length!==1 || state.table[0].rank===16)return false;
   const sameSuit=cards[0].suit===state.table[0].suit;
@@ -672,7 +670,6 @@ function clearTrick(startIndex){
  state.effects=[];
  state.jBack=false;
  state.jBackNineLock=false;
- state.downNumberJBackSequence=false;
  state.lastPlayer=-1;
  state.eightCutPending=false;
  state.downNumberBaseRank=null;
@@ -770,9 +767,7 @@ function playCards(cards,byCpu=false){
   cards[0].rank!==16 && state.table[0].rank!==16 &&
   cards[0].suit===state.table[0].suit &&
   Math.abs(cards[0].rank-state.table[0].rank)===1;
- const jBackDownStep=state.table.length===1&&cards.length===1&&isJBackDownStep(state.table[0],cards[0]);
  const previousDownNumberBase=state.downNumberBaseRank;
- const wasJBackDownSequence=state.downNumberJBackSequence;
 
  removeCards(p,cards);
  state.selected.clear();
@@ -780,7 +775,6 @@ function playCards(cards,byCpu=false){
  // ダウンナンバーは同じスートの前後1つの数字で連続できる。
  // ダウンナンバー以外のカードが出たら通常の比較に戻す。
  state.downNumberBaseRank=downNumberPlay ? (previousDownNumberBase!==null ? previousDownNumberBase : oldTable[0].rank) : null;
- state.downNumberJBackSequence=(jBackDownStep || (wasJBackDownSequence&&state.jBack&&oldTable.length===1&&cards.length===1&&cards[0].suit===oldTable[0].suit));
  state.lastCards=cards.slice();
  state.lastPlayMode={revolution:state.revolution,jBack:state.jBack};
  state.lastPlayer=state.turn;
