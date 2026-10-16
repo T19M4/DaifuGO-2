@@ -81,15 +81,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .q-bomb-card{animation:qBombPop 1.1s ease both;outline:3px solid #ffd85a;box-shadow:0 0 22px #ffcf33}
 .q-bomb-show{background:radial-gradient(circle,#7a2020aa,transparent 72%);border-radius:14px}
 @keyframes qBombPop{0%{transform:translateY(18px) scale(.65) rotate(-8deg);opacity:0}18%{transform:translateY(0) scale(1.12) rotate(3deg);opacity:1}35%{transform:scale(1) rotate(0);opacity:1}75%{transform:scale(1.04);opacity:1}100%{transform:scale(.75);opacity:0}}
-.fourstop-bubble{position:fixed;left:50%;top:24%;transform:translate(-50%,18px) scale(.75);opacity:0;pointer-events:none;z-index:2000;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:22px;padding:16px 25px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}
+.fourstop-bubble{position:fixed;left:50%;top:24%;transform:translate(-50%,18px) scale(.75);opacity:0;pointer-events:none;z-index:5001;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:22px;padding:16px 25px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}
 .fourstop-bubble::after{content:"";position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);border-width:17px 14px 0;border-style:solid;border-color:#ffbd45 transparent transparent}
 .fourstop-bubble.show{animation:fourstop-pop 1.8s ease both}
 @keyframes fourstop-pop{0%{opacity:0;transform:translate(-50%,18px) scale(.65)}12%{opacity:1;transform:translate(-50%,0) scale(1.08)}22%{transform:translate(-50%,0) scale(1)}78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-18px) scale(.9)}}
 
-.jj-bubble{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;pointer-events:none;z-index:2100;color:#fff;font-size:clamp(25px,5vw,58px);font-weight:1000;text-align:center;white-space:nowrap;text-shadow:0 4px 0 #8b1c1c,0 0 18px #ffec62,3px 6px 12px #000;background:linear-gradient(135deg,#ff3b3b,#ff8a00,#ffdf3d);border:4px solid #fff6a6;border-radius:24px;padding:18px 24px;box-shadow:0 0 0 6px #ff3b3b88,0 0 38px #ffdf3d}
+.jj-bubble{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;pointer-events:none;z-index:5002;color:#fff;font-size:clamp(25px,5vw,58px);font-weight:1000;text-align:center;white-space:nowrap;text-shadow:0 4px 0 #8b1c1c,0 0 18px #ffec62,3px 6px 12px #000;background:linear-gradient(135deg,#ff3b3b,#ff8a00,#ffdf3d);border:4px solid #fff6a6;border-radius:24px;padding:18px 24px;box-shadow:0 0 0 6px #ff3b3b88,0 0 38px #ffdf3d}
 .jj-bubble.show{animation:jj-shout 1.6s cubic-bezier(.2,.8,.2,1) both}
 @keyframes jj-shout{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(-12deg)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.2) rotate(5deg)}24%{transform:translate(-50%,-50%) scale(.95) rotate(-3deg)}36%{transform:translate(-50%,-50%) scale(1.05) rotate(2deg)}72%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(8deg)}}
-.revolution-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:2050;pointer-events:none;overflow:hidden;background:radial-gradient(circle at center,#ffed5aee 0%,#ff4a00cc 35%,#250044dd 75%)}
+.revolution-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:5000;pointer-events:none;overflow:hidden;background:radial-gradient(circle at center,#ffed5aee 0%,#ff4a00cc 35%,#250044dd 75%)}
 .revolution-overlay.show{display:flex;animation:revolution-screen 3s ease both}
 .revolution-title{font-size:clamp(42px,10vw,110px);font-weight:1000;text-align:center;color:#fff;text-shadow:0 5px 0 #a00000,0 0 20px #fff,0 0 45px #ffe600;transform:scale(.2) rotate(-10deg);padding:20px}
 .revolution-overlay.show .revolution-title{animation:revolution-title 3s cubic-bezier(.15,.8,.25,1) both}
@@ -1467,6 +1467,7 @@ let onlineRoomCode = null;
 let onlineIsHost = false;
 let onlineGameData = null;
 let onlineSelected = new Set();
+let onlineSeenLogs = new Set();
 function openOnlineModal(){
  const modal=document.getElementById('onlineModal');modal.classList.add('open');document.getElementById('onlineError').textContent='';
  if(!onlineSocket){
@@ -1500,9 +1501,12 @@ document.getElementById('onlineModal').addEventListener('click',e=>{if(e.target.
 function onlineCardLabel(c){return c.rank===16?'JOKER':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[c.rank]||String(c.rank))+c.suit;}
 function makeOnlineCard(c,selected,click){const b=document.createElement('button');b.type='button';b.className='online-card'+(('♥♦'.includes(c.suit))?' red':'')+(selected?' selected':'');const corner=document.createElement('span');corner.textContent=c.rank===16?'★':onlineCardLabel(c);const big=document.createElement('span');big.className='big';big.textContent=c.rank===16?'★':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[c.rank]||String(c.rank));const bottom=document.createElement('span');bottom.textContent=c.suit;b.append(corner,big,bottom);if(click)b.addEventListener('click',click);return b;}
 function renderOnlineGame(g){
+ if((g.logs||[]).some(line=>line.includes('ゲーム開始'))&&g.logs.length<3)onlineSeenLogs.clear();
+ const freshLogs=(g.logs||[]).filter(line=>!onlineSeenLogs.has(line));
+ freshLogs.forEach(line=>{onlineSeenLogs.add(line);if(line.includes('4止め'))showFourStopBubble();if(line.includes('革命！')||line.includes('革命返し！'))showRevolutionAnimation(line.includes('革命！')&&!line.includes('革命返し！'));if(line.includes('Jバック')&&line.includes('発動'))showJJBubble();});
  const modal=document.getElementById('onlineGameModal');modal.classList.add('open');document.getElementById('onlineGameRoom').textContent=onlineRoomCode||'';
  const current=g.players[g.turn];let status=g.finished?'ゲーム終了：'+(g.finishOrder||[]).join(' → '):g.pendingQ?(g.pendingQ.mine?'Qボンバーの数字を選択してください':'Qボンバー処理中'):((g.myTurn?'あなたのターン':`${current?.name||'相手'}のターン`)+(g.firstMove?'（♦3を出して開始）':''));
- document.getElementById('onlineGameStatus').textContent=g.notice||status;
+ document.getElementById('onlineGameStatus').textContent=(g.notice||status)+((g.effects&&g.effects.length)?'　｜　'+[...new Set(g.effects)].join(' / '):'')+(g.jBack?'　｜　Jバック':'')+(g.revolution?'　｜　革命':'')+(g.lockSuit?'　｜　縛り '+g.lockSuit:'');
  const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・上がり`: `手札 ${p.handCount}枚`;d.append(b,sm);ps.append(d);});
  const table=document.getElementById('onlineGameTable');table.innerHTML='';if(g.table?.length)g.table.forEach(c=>table.append(makeOnlineCard(c,false,null)));else table.textContent='場にカードはありません';
  const hand=document.getElementById('onlineGameHand');hand.innerHTML='';const myHand=g.myHand||[];document.getElementById('onlineHandCount').textContent=`${myHand.length}枚`;
