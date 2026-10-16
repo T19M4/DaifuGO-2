@@ -1,8 +1,8 @@
 {
   "name": "daifugo-online",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "DaifuGO-2 online server",
+  "description": "DaifuGO-2 online server with original offline game retained",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
