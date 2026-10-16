@@ -168,6 +168,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>10捨て</td><td>指定された枚数のカードを捨てる（出した10の枚数分）</td></tr>
 <tr><td>Jバック</td><td>一時的にカードの強さを逆転</td></tr>
 <tr><td>Qボンバー</td><td>Qで指定した数字のカードを全員の手札から破壊する</td></tr>
+<tr><td>ダウンナンバー</td><td>場が1枚のとき、同じマークで1つ下の数字を出せる。例：♠4に♠3。その後は元の数字より大きいカード（♠5以上）を出せる。場が空なら発動しない</td></tr>
 <tr><td>縛り</td><td>場にカードがある状態で、同じマークで続けて出した場合に発生</td></tr>
 <tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる</td></tr>
 <tr><td>禁止上がり</td><td>2・ジョーカーなど禁止カードで上がると反則</td></tr>
@@ -274,7 +275,7 @@ function newGame(){
   players,turn:start,deck:[],table:[],trickCards:[],lastCards:[],lastPlayer:-1,
   passCount:0,selected:new Set(),jBack:false,revolution:false,neutralizeNext:false,lockSuit:null,effects:[],
   finished:false,finishOrder:[],pendingQ:false,turnSerial:0,
-  firstMove:true,eightCutPending:false,pendingDiscardCount:0
+  firstMove:true,eightCutPending:false,pendingDiscardCount:0,downNumberBaseRank:null
  };
 
  log('ゲーム開始。♦3を持つ'+players[start].name+'が♦3を出してスタートします。');
@@ -420,13 +421,31 @@ function canBeat(cards){
  if(state.eightCutPending&&state.table.some(c=>c.rank===8))return isFourStopPair(cards);
 
  if(cards.length!==state.table.length)return false;
- // ジョーカーは縛りに関係なく出せる。
+ // 縛り中でも、場がジョーカーでない限りジョーカー単独は出せる。
+ // 革命やJバック中でも、縛りによってジョーカーが出せなくならないようにする。
+ if(state.lockSuit && cards.length===1 && cards[0].rank===16 &&
+    !state.table.some(c=>c.rank===16))return true;
  // 場にジョーカーがあり、場に9が含まれていなければ♠3返しができる。
  if(state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&
     cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;
 
  // ジョーカーを含む出し方は縛りを無視する。それ以外は縛りに従う。
  if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
+
+ // ダウンナンバー直後は、ダウンナンバーを受けた元の数字より大きいカードを出す。
+ // 例：♠4に♠3を出した場合、次は♠5以上（数字が4より大きいカード）。
+ if(state.downNumberBaseRank!==null){
+  return cards.length===1 && cards[0].rank!==16 && cards[0].rank>state.downNumberBaseRank;
+ }
+
+ // 場にカードが1枚だけあるとき、同じマークで1つ下のカードを出せる。
+ // 場が空のときは上の処理で終了するため、ダウンナンバーは発動しない。
+ if(state.table.length===1 && cards.length===1 &&
+    cards[0].rank!==16 && state.table[0].rank!==16 &&
+    cards[0].suit===state.table[0].suit &&
+    cards[0].rank===state.table[0].rank-1){
+  return true;
+ }
 
  if(cards.length>1&&!cards.every(c=>c.rank===cards[0].rank)){
   return cards[0].rank>state.table[0].rank;
@@ -459,6 +478,7 @@ function clearTrick(startIndex){
  state.jBack=false;
  state.lastPlayer=-1;
  state.eightCutPending=false;
+ state.downNumberBaseRank=null;
  state.turn=startIndex;
  log('場が流れました。'+state.players[startIndex].name+'から再開。');
 }
@@ -516,10 +536,18 @@ function playCards(cards,byCpu=false){
  // 場が空でなければ、前の場とのマーク一致を縛り判定に使う
  const oldLockSuit=state.lockSuit;
  const wasTableOccupied=state.table.length>0;
+ const downNumberPlay=state.table.length===1 && cards.length===1 &&
+  cards[0].rank!==16 && state.table[0].rank!==16 &&
+  cards[0].suit===state.table[0].suit &&
+  cards[0].rank===state.table[0].rank-1;
+ const previousDownNumberBase=state.downNumberBaseRank;
 
  removeCards(p,cards);
  state.selected.clear();
  state.table=cards.slice();
+ // ダウンナンバーを使った場合は、次に出せる数字の基準を元の場の数字に固定する。
+ // それ以外のカードが出たら通常の比較に戻す。
+ state.downNumberBaseRank=downNumberPlay ? oldTable[0].rank : null;
  state.lastCards=cards.slice();
  state.lastPlayer=state.turn;
  state.passCount=0;
@@ -542,6 +570,7 @@ function playCards(cards,byCpu=false){
 
  let msg=p.name+'：'+cards.map(cardText).join(' ');
  log(msg);
+ if(downNumberPlay)log('ダウンナンバー！ '+cardText(oldTable[0])+'に対して'+cardText(cards[0])+'を出しました。次は'+rankName(oldTable[0].rank+1)+'以上の数字を出せます。');
 
  let clearNow=false;
  let skip=0;
@@ -1205,4 +1234,4 @@ document.addEventListener('keydown',e=>{
 newGame();
 </script>
 </body>
-</html>これ縛り中でもジョーカーを出せるようにして　コードは基本変えず修正箇所だけ。終わったら全文ここに書いて
+</html>
