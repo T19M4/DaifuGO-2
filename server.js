@@ -1,132 +1,46 @@
-
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const crypto = require("crypto");
-
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const crypto = require('crypto');
 const app = express();
 const server = http.createServer(app);
-
-const io = new Server(server, {
-  cors: {
-    origin: [
-      "https://t19m4.github.io"
-    ],
-    methods: ["GET", "POST"]
-  }
-});
-
+const io = new Server(server, { cors: { origin: ['https://t19m4.github.io'], methods: ['GET','POST'] } });
 const rooms = new Map();
-
-app.get("/", (_req, res) => {
-  res.send("DaifuGO-2 online server is running.");
+const SUITS = ['♠','♥','♦','♣'];
+const RANKS = [3,4,5,6,7,8,9,10,11,12,13,14,15];
+const rankName = r => ({11:'J',12:'Q',13:'K',14:'A',15:'2',16:'ジョーカー'}[r] || String(r));
+const cardText = c => c.rank === 16 ? 'JOKER' : `${rankName(c.rank)}${c.suit}`;
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+const power = (rank,g) => { let p=({3:1,4:2,5:3,6:4,7:5,8:6,9:7,10:8,11:9,12:10,13:11,14:12,15:13,16:14})[rank] || rank; if(g.revolution)p=15-p; if(g.jBack)p=15-p; return p; };
+function makeRoomCode(){return crypto.randomBytes(3).toString('hex').toUpperCase();}
+function publicPlayers(room){return room.players.map(p=>({name:p.name,isCPU:false}));}
+function addLog(g,msg){g.logs.push(msg); if(g.logs.length>35)g.logs.shift();}
+function active(i,g){return !!g.players[i] && !g.players[i].finished && g.players[i].hand.length>0;}
+function nextActive(from,g,steps=1){let i=from; for(let n=0;n<steps;n++){let found=-1; for(let s=1;s<=g.players.length;s++){const j=(i+s)%g.players.length;if(active(j,g)){found=j;break;}} if(found<0)return -1; i=found;} return i;}
+function clearTrick(g,start){g.table=[];g.lastCards=[];g.lastPlayer=-1;g.passCount=0;g.lockSuit=null;g.eightPending=false;g.downBase=null;g.effects=[];g.neutralizeCount=0;g.jBackNineLock=false;g.trickHistory=[];g.turn=active(start,g)?start:nextActive(start,g); if(g.turn<0)g.finished=true; addLog(g,`場が流れました。${g.players[g.turn]?.name || ''}から再開。`);}
+function validSet(cards){if(!cards.length)return false;const jokers=cards.filter(c=>c.rank===16),normal=cards.filter(c=>c.rank!==16);if(cards.length===1)return true;if(normal.length&&normal.every(c=>c.rank===normal[0].rank))return cards.length<=4&&jokers.length<=2;if(!normal.length)return cards.length<=2;if(jokers.length<1||jokers.length>2||normal.length<2||!normal.every(c=>c.suit===normal[0].suit))return false;const ranks=normal.map(c=>c.rank).sort((a,b)=>a-b);return new Set(ranks).size===ranks.length&&(Math.max(...ranks)-Math.min(...ranks)<cards.length)&&cards.length<=13;}
+function canBeat(cards,g){if(!validSet(cards))return false;if(g.firstMove)return cards.length===1&&cards[0].rank===3&&cards[0].suit==='♦';if(!g.table.length)return true;if(g.table.length===1&&cards.length===1&&cards[0].rank===16)return true;if(g.eightPending&&g.table.some(c=>c.rank===8))return cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));if(cards.length!==g.table.length)return false;if(g.table.some(c=>c.rank===16)&&!g.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;if(g.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==g.lockSuit))return false;if(g.downBase!==null&&cards.length===1&&g.table.length===1&&cards[0].rank!==16&&g.table[0].rank!==16){return (cards[0].suit===g.table[0].suit&&cards[0].rank===g.table[0].rank-1)||cards[0].rank>g.downBase;}if(g.table.length===1&&cards.length===1&&cards[0].rank!==16&&g.table[0].rank!==16&&cards[0].suit===g.table[0].suit&&cards[0].rank===g.table[0].rank-1)return true;const top=g.table[0].rank;return power(cards[0].rank,g)>power(top,g);}
+function emitGame(code){const room=rooms.get(code);if(!room||!room.game)return;const g=room.game;for(const p of room.players){const gp=g.players.find(x=>x.id===p.id);io.to(p.id).emit('onlineGameState',snapshot(g,gp));} }
+function snapshot(g,p){return {started:true,finished:g.finished,players:g.players.map(x=>({name:x.name,isCPU:x.isCPU,handCount:x.hand.length,finished:x.finished,place:x.place||0})),myHand:p?p.hand:[],turn:g.turn,table:g.table,lastCards:g.lastCards,lastPlayer:g.lastPlayer,firstMove:g.firstMove,eightPending:g.eightPending,jBack:g.jBack,revolution:g.revolution,lockSuit:g.lockSuit,downBase:g.downBase,neutralizeCount:g.neutralizeCount,pendingQ:g.pendingQ?{actor:g.pendingQ.actor,remaining:g.pendingQ.remaining,mine:!!p&&g.players[g.pendingQ.actor]?.id===p.id}:null,logs:g.logs,finishOrder:g.finishOrder,notice:g.notice||'',myTurn:!!p&&g.players[g.turn]?.id===p.id&&!g.finished&&!g.pendingQ};}
+function broadcastLobby(code){const r=rooms.get(code);if(r)io.to(code).emit('playersUpdated',publicPlayers(r));}
+function startGame(code){const room=rooms.get(code);if(!room||room.game)return;const players=room.players.map(p=>({id:p.id,name:p.name,isCPU:false,hand:[],finished:false}));let n=1;while(players.length<4)players.push({id:`CPU_${code}_${n}_${crypto.randomBytes(3).toString('hex')}`,name:`CPU ${n++}`,isCPU:true,hand:[],finished:false});const deck=[];for(const s of SUITS)for(const r of RANKS)deck.push({id:`${s}${r}`,suit:s,rank:r});deck.push({id:'joker1',suit:'',rank:16},{id:'joker2',suit:'',rank:16});shuffle(deck);deck.forEach((c,i)=>players[i%4].hand.push(c));players.forEach(p=>p.hand.sort((a,b)=>a.rank-b.rank||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)));const turn=players.findIndex(p=>p.hand.some(c=>c.suit==='♦'&&c.rank===3));room.game={players,turn,table:[],lastCards:[],lastPlayer:-1,passCount:0,firstMove:true,eightPending:false,jBack:false,revolution:false,lockSuit:null,downBase:null,neutralizeCount:0,jBackNineLock:false,pendingQ:null,finished:false,finishOrder:[],logs:[],effects:[],trickHistory:[],notice:`ゲーム開始。♦3を持つ${players[turn].name}から開始。`};addLog(room.game,room.game.notice);emitGame(code);if(players[turn].isCPU)setTimeout(()=>cpuTurn(code),900);}
+function finishCheck(g,p){if(p.hand.length!==0)return false;const last=g.lastCards||[];const banned=last.some(c=>c.rank===15||c.rank===16);if(banned){p.finished=true;p.place=4;g.finishOrder.push(`${p.name}（反則上がり）`);addLog(g,`${p.name}は反則上がり。最下位扱い。`);}else{p.finished=true;p.place=g.finishOrder.length+1;g.finishOrder.push(p.name);addLog(g,`${p.name}が${p.place}位で上がり！`);}if(g.players.filter(x=>!x.finished).length<=1){g.finished=true;const lastp=g.players.find(x=>!x.finished);if(lastp){lastp.finished=true;lastp.place=4;g.finishOrder.push(lastp.name);}addLog(g,'ゲーム終了：'+g.finishOrder.join(' → '));return true;}return false;}
+function applyQ(code,rank){const room=rooms.get(code),g=room?.game;if(!g||!g.pendingQ)return;const actor=g.pendingQ.actor;let destroyed=0;for(const p of g.players){const before=p.hand.length;p.hand=p.hand.filter(c=>c.rank!==rank);destroyed+=before-p.hand.length;}addLog(g,`${g.players[actor].name}のQボンバー：${rankName(rank)}を${destroyed}枚破壊。`);g.pendingQ=null;if(finishCheck(g,g.players[actor])){emitGame(code);return;}advanceAfterPlay(code,actor,0);}
+function advanceAfterPlay(code,actor,skip){const room=rooms.get(code),g=room?.game;if(!g)return;if(g.finished){emitGame(code);return;}if(g.table.length&&g.lastCards.length&&g.players[actor].hand.length===0){}let n=1+skip;g.turn=nextActive(actor,g,n);if(g.turn<0){g.finished=true;emitGame(code);return;}g.notice=`${g.players[g.turn].name}のターン`;emitGame(code);if(g.players[g.turn].isCPU)setTimeout(()=>cpuTurn(code),900);}
+function doPlay(code,playerId,ids){const room=rooms.get(code),g=room?.game;if(!g||g.finished||g.pendingQ)return;const p=g.players[g.turn];if(!p||p.id!==playerId||p.isCPU)return;const wanted=new Set(Array.isArray(ids)?ids:[]);const cards=p.hand.filter(c=>wanted.has(c.id));if(cards.length!==wanted.size||!cards.length||!canBeat(cards,g)){io.to(playerId).emit('onlineActionError','そのカードは出せません。');return;}const oldTable=g.table.slice(),wasOccupied=oldTable.length>0;const fourStop=g.eightPending&&cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));const down=oldTable.length===1&&cards.length===1&&cards[0].rank!==16&&oldTable[0].rank!==16&&cards[0].suit===oldTable[0].suit&&cards[0].rank===oldTable[0].rank-1;const oldLock=g.lockSuit;const jPlayedEarlier=g.trickHistory.some(x=>x.some(c=>c.rank===11));p.hand=p.hand.filter(c=>!wanted.has(c.id));g.table=cards;g.lastCards=cards;g.lastPlayer=g.turn;g.passCount=0;g.firstMove=false;g.downBase=down?(g.downBase!==null?g.downBase:oldTable[0].rank):null;g.trickHistory.push(cards);if(wasOccupied&&oldTable.length&&cards.every(c=>c.suit&&c.suit===cards[0].suit)&&oldTable.every(c=>c.suit&&c.suit===oldTable[0].suit)&&cards[0].suit===oldTable[0].suit)g.lockSuit=cards[0].suit;else if(!wasOccupied)g.lockSuit=null;else g.lockSuit=oldLock&&cards.every(c=>c.suit===oldLock)?oldLock:null;addLog(g,`${p.name}：${cards.map(cardText).join(' ')}`);if(down)addLog(g,'ダウンナンバー！');let skip=0;const suppress=g.neutralizeCount>0||g.jBackNineLock;if(g.neutralizeCount>0)g.neutralizeCount--;if(fourStop){addLog(g,`${p.name}が4止め！`);if(finishCheck(g,p)){emitGame(code);return;}clearTrick(g,g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}if(!suppress){const jokerSub=cards.some(c=>c.rank===16)&&cards.some(c=>c.rank!==16)?1:0;const count=r=>cards.filter(c=>c.rank===r).length+(jokerSub&&cards.some(c=>c.rank===r)?1:0);skip=count(5);const give=count(7);if(give){const recipient=nextActive(g.turn,g);for(let k=0;k<Math.min(give,p.hand.length);k++){if(recipient>=0&&p.hand.length){p.hand.sort((a,b)=>b.rank-a.rank);const gift=p.hand.shift();g.players[recipient].hand.push(gift);addLog(g,`${p.name}が7渡しで${g.players[recipient].name}に${cardText(gift)}を渡した。`);}}}if(cards.some(c=>c.rank===8)){g.eightPending=true;addLog(g,'8切り：4止めの機会です。');}if(cards.some(c=>c.rank===9)){g.neutralizeCount=Math.max(g.neutralizeCount,count(9));addLog(g,`9の効果：次の${g.neutralizeCount}回の特殊効果を無効化。`);}const discard=count(10);for(let k=0;k<Math.min(discard,p.hand.length);k++){const ix=Math.floor(Math.random()*p.hand.length);const d=p.hand.splice(ix,1)[0];addLog(g,`${p.name}が10捨てで${cardText(d)}を捨てた。`);}const js=count(11);for(let k=0;k<js;k++)g.jBack=!g.jBack;if(js)addLog(g,`Jバック${js%2?'発動':'解除'}。`);const normal=cards.filter(c=>c.rank!==16),jokerCount=cards.filter(c=>c.rank===16).length;const rev=(cards.length===4&&normal.length>0&&normal.every(c=>c.rank===normal[0].rank)&&jokerCount<=2)||(cards.length>=4&&jokerCount>0&&normal.length>=2&&normal.every(c=>c.suit===normal[0].suit)&&new Set(normal.map(c=>c.rank)).size===normal.length&&(Math.max(...normal.map(c=>c.rank))-Math.min(...normal.map(c=>c.rank))<cards.length));if(rev){g.revolution=!g.revolution;addLog(g,g.revolution?'革命！':'革命返し！');}const qs=count(12);if(qs){g.pendingQ={actor:g.turn,remaining:qs};if(p.isCPU){applyQ(code,RANKS[Math.floor(Math.random()*RANKS.length)]);return;}g.notice='Qボンバー：破壊する数字を選んでください。';emitGame(code);return;}}
+if(g.jBack&&jPlayedEarlier&&cards.some(c=>c.rank===9)){g.jBackNineLock=true;addLog(g,'Jバック＋9：以降の特殊効果を場が流れるまで封印。');}if(cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠'&&oldTable.some(c=>c.rank===16)&&!oldTable.some(c=>c.rank===9)){addLog(g,'♠3返し！');clearTrick(g,g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}if(finishCheck(g,p)){emitGame(code);return;}if(g.eightPending&&cards.some(c=>c.rank===8)===false&&fourStop){}advanceAfterPlay(code,g.turn,skip);}
+function doPass(code,playerId){const room=rooms.get(code),g=room?.game;if(!g||g.finished||g.pendingQ)return;const p=g.players[g.turn];if(!p||p.id!==playerId||p.isCPU)return;if(g.firstMove)return;addLog(g,`${p.name}はパス。`);if(g.eightPending){clearTrick(g,g.lastPlayer>=0?g.lastPlayer:g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}g.passCount++;const activeCount=g.players.filter((_,i)=>active(i,g)).length;if(g.passCount>=Math.max(1,activeCount-1)){clearTrick(g,g.lastPlayer>=0?g.lastPlayer:g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}g.turn=nextActive(g.turn,g);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);}
+function cpuChoose(p,g){if(g.firstMove){const c=p.hand.find(c=>c.suit==='♦'&&c.rank===3);return c?[c]:[];}const groups=new Map();for(const c of p.hand){const key=c.rank===16?'joker':String(c.rank);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(c);}const options=[];for(const group of groups.values()){for(let n=1;n<=Math.min(group.length,g.table.length||1);n++){if(n!== (g.table.length||1))continue;const combo=group.slice(0,n);if(canBeat(combo,g))options.push(combo);}}if(g.eightPending){const fours=p.hand.filter(c=>c.rank===4);const joker=p.hand.find(c=>c.rank===16);if(fours.length>=2&&canBeat(fours.slice(0,2),g))return fours.slice(0,2);if(fours.length&&joker&&canBeat([fours[0],joker],g))return [fours[0],joker];return [];}options.sort((a,b)=>power(a[0].rank,g)-power(b[0].rank,g)||a.length-b.length);return options[0]||[];}
+function cpuTurn(code){const room=rooms.get(code),g=room?.game;if(!g||g.finished||g.pendingQ||!g.players[g.turn]?.isCPU)return;const p=g.players[g.turn];const cards=cpuChoose(p,g);if(cards.length)doPlay(code,p.id,cards.map(c=>c.id));else doPass(code,p.id);}
+function leaveRoom(socket){const code=socket.data.roomCode;if(!code)return;const room=rooms.get(code);socket.leave(code);socket.data.roomCode=null;if(!room)return;room.players=room.players.filter(p=>p.id!==socket.id);if(!room.players.length){rooms.delete(code);return;}if(room.hostId===socket.id)room.hostId=room.players[0].id;if(room.game){const gp=room.game.players.find(p=>p.id===socket.id);if(gp){gp.disconnected=true;gp.isCPU=true;gp.name += '（CPU操作）';addLog(room.game,`${gp.name}が切断されたためCPU操作に切り替え。`);emitGame(code);}}broadcastLobby(code);}
+app.get('/',(_req,res)=>res.send('DaifuGO-2 online server is running.'));
+io.on('connection',socket=>{
+ socket.on('createRoom',(payload={},cb)=>{const name=String(payload.name||'').trim().slice(0,6);if(!name)return cb?.({ok:false,message:'名前を入力してください。'});leaveRoom(socket);let code;do{code=makeRoomCode();}while(rooms.has(code));const room={hostId:socket.id,players:[{id:socket.id,name}],game:null};rooms.set(code,room);socket.join(code);socket.data.roomCode=code;cb?.({ok:true,roomCode:code,isHost:true,players:publicPlayers(room)});});
+ socket.on('joinRoom',(payload={},cb)=>{const code=String(payload.roomCode||'').trim().toUpperCase(),name=String(payload.name||'').trim().slice(0,6),room=rooms.get(code);if(!name)return cb?.({ok:false,message:'名前を入力してください。'});if(!room)return cb?.({ok:false,message:'部屋が見つかりません。'});if(room.game)return cb?.({ok:false,message:'ゲーム開始後は参加できません。'});if(room.players.length>=4)return cb?.({ok:false,message:'この部屋は満員です。'});leaveRoom(socket);room.players.push({id:socket.id,name});socket.join(code);socket.data.roomCode=code;broadcastLobby(code);cb?.({ok:true,roomCode:code,isHost:false,players:publicPlayers(room)});});
+ socket.on('startOnlineGame',(_payload,cb)=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return cb?.({ok:false,message:'先にルームへ参加してください。'});if(room.hostId!==socket.id)return cb?.({ok:false,message:'ゲーム開始はルーム作成者のみ実行できます。'});if(room.game&&!room.game.finished)return cb?.({ok:false,message:'ゲームはすでに進行中です。'});startGame(code);cb?.({ok:true});});
+ socket.on('onlinePlay',(payload={},cb)=>{const code=socket.data.roomCode;if(!code)return cb?.({ok:false,message:'ルームに参加していません。'});doPlay(code,socket.id,payload.cardIds||[]);cb?.({ok:true});});
+ socket.on('onlinePass',(_payload,cb)=>{const code=socket.data.roomCode;if(!code)return cb?.({ok:false,message:'ルームに参加していません。'});doPass(code,socket.id);cb?.({ok:true});});
+ socket.on('onlineQSelect',(payload={},cb)=>{const code=socket.data.roomCode,room=rooms.get(code),g=room?.game;if(!g||!g.pendingQ||g.players[g.pendingQ.actor]?.id!==socket.id)return cb?.({ok:false,message:'Qボンバーの選択状態ではありません。'});const rank=Number(payload.rank);if(!RANKS.includes(rank)&&rank!==16)return cb?.({ok:false,message:'数字を選択してください。'});applyQ(code,rank);cb?.({ok:true});});
+ socket.on('leaveRoom',cb=>{leaveRoom(socket);cb?.({ok:true});});socket.on('disconnect',()=>leaveRoom(socket));
 });
-
-function makeRoomCode() {
-  return crypto.randomBytes(3).toString("hex").toUpperCase();
-}
-
-io.on("connection", (socket) => {
-  socket.on("createRoom", ({ name }, callback) => {
-    name = String(name || "").trim().slice(0, 6);
-
-    if (!name) {
-      return callback?.({
-        ok: false,
-        message: "名前を入力してください。"
-      });
-    }
-
-    let code;
-    do {
-      code = makeRoomCode();
-    } while (rooms.has(code));
-
-    rooms.set(code, {
-      players: [{
-        id: socket.id,
-        name
-      }]
-    });
-
-    socket.join(code);
-    socket.data.roomCode = code;
-
-    callback?.({
-      ok: true,
-      roomCode: code,
-      players: rooms.get(code).players
-    });
-  });
-
-  socket.on("joinRoom", ({ roomCode, name }, callback) => {
-    const code = String(roomCode || "")
-      .trim()
-      .toUpperCase();
-    name = String(name || "").trim().slice(0, 6);
-
-    const room = rooms.get(code);
-
-    if (!name) {
-      return callback?.({
-        ok: false,
-        message: "名前を入力してください。"
-      });
-    }
-
-    if (!room) {
-      return callback?.({
-        ok: false,
-        message: "部屋が見つかりません。"
-      });
-    }
-
-    if (room.players.length >= 4) {
-      return callback?.({
-        ok: false,
-        message: "この部屋は満員です。"
-      });
-    }
-
-    room.players.push({
-      id: socket.id,
-      name
-    });
-
-    socket.join(code);
-    socket.data.roomCode = code;
-
-    io.to(code).emit("playersUpdated", room.players);
-
-    callback?.({
-      ok: true,
-      roomCode: code,
-      players: room.players
-    });
-  });
-
-  socket.on("disconnect", () => {
-    const code = socket.data.roomCode;
-    if (!code) return;
-
-    const room = rooms.get(code);
-    if (!room) return;
-
-    room.players = room.players.filter(
-      player => player.id !== socket.id
-    );
-
-    if (room.players.length === 0) {
-      rooms.delete(code);
-    } else {
-      io.to(code).emit("playersUpdated", room.players);
-    }
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server listening on port ${PORT}`);
-});
-
-
+const PORT=process.env.PORT||3000;server.listen(PORT,'0.0.0.0',()=>console.log(`Server listening on port ${PORT}`));
