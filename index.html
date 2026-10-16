@@ -81,15 +81,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .q-bomb-card{animation:qBombPop 1.1s ease both;outline:3px solid #ffd85a;box-shadow:0 0 22px #ffcf33}
 .q-bomb-show{background:radial-gradient(circle,#7a2020aa,transparent 72%);border-radius:14px}
 @keyframes qBombPop{0%{transform:translateY(18px) scale(.65) rotate(-8deg);opacity:0}18%{transform:translateY(0) scale(1.12) rotate(3deg);opacity:1}35%{transform:scale(1) rotate(0);opacity:1}75%{transform:scale(1.04);opacity:1}100%{transform:scale(.75);opacity:0}}
-.fourstop-bubble{position:fixed;left:50%;top:24%;transform:translate(-50%,18px) scale(.75);opacity:0;pointer-events:none;z-index:5001;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:22px;padding:16px 25px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}
+.fourstop-bubble{position:fixed;left:50%;top:24%;transform:translate(-50%,18px) scale(.75);opacity:0;pointer-events:none;z-index:2000;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:22px;padding:16px 25px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}
 .fourstop-bubble::after{content:"";position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);border-width:17px 14px 0;border-style:solid;border-color:#ffbd45 transparent transparent}
 .fourstop-bubble.show{animation:fourstop-pop 1.8s ease both}
 @keyframes fourstop-pop{0%{opacity:0;transform:translate(-50%,18px) scale(.65)}12%{opacity:1;transform:translate(-50%,0) scale(1.08)}22%{transform:translate(-50%,0) scale(1)}78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-18px) scale(.9)}}
 
-.jj-bubble{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;pointer-events:none;z-index:5002;color:#fff;font-size:clamp(25px,5vw,58px);font-weight:1000;text-align:center;white-space:nowrap;text-shadow:0 4px 0 #8b1c1c,0 0 18px #ffec62,3px 6px 12px #000;background:linear-gradient(135deg,#ff3b3b,#ff8a00,#ffdf3d);border:4px solid #fff6a6;border-radius:24px;padding:18px 24px;box-shadow:0 0 0 6px #ff3b3b88,0 0 38px #ffdf3d}
+.jj-bubble{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;pointer-events:none;z-index:2100;color:#fff;font-size:clamp(25px,5vw,58px);font-weight:1000;text-align:center;white-space:nowrap;text-shadow:0 4px 0 #8b1c1c,0 0 18px #ffec62,3px 6px 12px #000;background:linear-gradient(135deg,#ff3b3b,#ff8a00,#ffdf3d);border:4px solid #fff6a6;border-radius:24px;padding:18px 24px;box-shadow:0 0 0 6px #ff3b3b88,0 0 38px #ffdf3d}
 .jj-bubble.show{animation:jj-shout 1.6s cubic-bezier(.2,.8,.2,1) both}
 @keyframes jj-shout{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(-12deg)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.2) rotate(5deg)}24%{transform:translate(-50%,-50%) scale(.95) rotate(-3deg)}36%{transform:translate(-50%,-50%) scale(1.05) rotate(2deg)}72%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(8deg)}}
-.revolution-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:5000;pointer-events:none;overflow:hidden;background:radial-gradient(circle at center,#ffed5aee 0%,#ff4a00cc 35%,#250044dd 75%)}
+.revolution-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:2050;pointer-events:none;overflow:hidden;background:radial-gradient(circle at center,#ffed5aee 0%,#ff4a00cc 35%,#250044dd 75%)}
 .revolution-overlay.show{display:flex;animation:revolution-screen 3s ease both}
 .revolution-title{font-size:clamp(42px,10vw,110px);font-weight:1000;text-align:center;color:#fff;text-shadow:0 5px 0 #a00000,0 0 20px #fff,0 0 45px #ffe600;transform:scale(.2) rotate(-10deg);padding:20px}
 .revolution-overlay.show .revolution-title{animation:revolution-title 3s cubic-bezier(.15,.8,.25,1) both}
@@ -109,7 +109,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 .online-game-modal{position:fixed;inset:0;z-index:4000;background:#001a16f2;display:none;overflow:auto;padding:12px;align-items:flex-start;justify-content:center}
 .online-game-modal.open{display:flex}.online-game-box{width:min(1100px,100%);background:#07382e;border:2px solid #ffd85a;border-radius:16px;padding:16px;box-shadow:0 12px 40px #0009;margin:auto}
-.online-game-players{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:12px 0}.online-game-player{background:#0a4938;border:1px solid #4e9b82;border-radius:10px;padding:9px;text-align:center;min-width:0}.online-game-player.active{outline:3px solid #ffd85a;background:#15553f}.online-game-player small{display:block;color:#bce8e7;margin-top:4px}
+.online-game-players{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.online-game-player{background:#0a4938;border:1px solid #4e9b82;border-radius:10px;padding:9px;text-align:center;min-width:0}.online-game-player.active{outline:3px solid #ffd85a;background:#15553f}.online-game-player small{display:block;color:#bce8e7;margin-top:4px}
 .online-game-table{min-height:115px;border:1px dashed #73b5a0;border-radius:12px;display:flex;justify-content:center;align-items:center;gap:5px;flex-wrap:wrap;padding:10px;margin:10px 0}.online-game-hand{display:flex;align-items:flex-end;justify-content:center;flex-wrap:wrap;gap:5px;min-height:95px;padding:10px;border:1px solid #478f81;border-radius:12px;background:#07382e}.online-card{width:52px;height:75px;border-radius:7px;background:#fff;color:#111;border:1px solid #ddd;display:flex;flex-direction:column;justify-content:space-between;padding:4px;font-weight:900;cursor:pointer}.online-card.red{color:#d51f2a}.online-card.selected{transform:translateY(-10px);outline:3px solid #ffd85a}.online-card .big{font-size:22px;align-self:center}.online-game-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0}.online-game-log{max-height:125px;overflow:auto;background:#042920;border-radius:8px;padding:8px;font-size:13px;line-height:1.6}.online-q-options{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}.online-q-options button{min-width:48px}.online-game-status{font-weight:800;color:#ffe88a;text-align:center;min-height:25px}.online-game-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
 @media(max-width:550px){.online-game-players{grid-template-columns:repeat(2,minmax(0,1fr))}.online-card{width:42px;height:64px}.online-game-box{padding:10px}}
 
@@ -188,7 +188,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>♠3返し</td><td>ジョーカーに対してスペードの3を出せる</td></tr>
 <tr><td>4止め</td><td>場に8があるとき、4のペアまたは4とジョーカーのペアで場を流し、自分から再開</td></tr>
 <tr><td>5スキップ</td><td>次のプレイヤーを飛ばす</td></tr>
-<tr><td>7渡し</td><td>手札から渡すカードを1枚選び、次のプレイヤーに渡す。プレイヤーがカードを選んで渡す</td></tr>
+<tr><td>7渡し</td><td>手札から渡すカードを1枚選び、次のプレイヤーに渡す。CPUもカードを選んで渡す</td></tr>
 <tr><td>8切り</td><td>他のプレイヤーが4を2枚、または4とジョーカーを出して4止めしない限り、全員のパス後に場を流して8を出した人から再開</td></tr>
 <tr><td>9能力無効化</td><td>9でカードの能力を無効化</td></tr>
 <tr><td>10捨て</td><td>指定された枚数のカードを捨てる（出した10の枚数分）</td></tr>
@@ -202,7 +202,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>都落ち</td><td>この版では未実装</td></tr>
 </tbody>
 </table>
-<div class="small"><b>最初のプレイヤー：</b> ♦3を持っている人。<br>オンライン対戦では、各プレイヤーが自分の端末から操作します。</div>
+<div class="small"><b>最初のプレイヤー：</b> ♦3を持っている人。<br>CPUはカードを出した後、2秒待ってから次の行動をします。</div>
 <button class="rulebutton" id="hideRules">ルールを閉じる</button>
 </aside>
 </div>
@@ -250,8 +250,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <p class="subtle">名前は最大6文字。ルームコードを友達に共有してください。</p>
   <label for="onlineName">プレイヤー名</label>
   <input id="onlineName" maxlength="6" autocomplete="nickname" placeholder="名前（最大6文字）">
-  <label for="onlinePlayerCount">対戦人数（ルーム作成者が選択）</label>
-  <select id="onlinePlayerCount" style="width:100%;padding:10px;border-radius:8px;margin:5px 0 12px;font-size:16px"><option value="3">3人モード（人間3人）</option><option value="4" selected>4人モード（人間4人）</option><option value="5">5人モード（人間5人）</option></select>
   <label for="onlineRoomCode">参加コード（参加する場合）</label>
   <input id="onlineRoomCode" maxlength="6" autocomplete="off" placeholder="例：A1B2C3">
   <div class="online-actions">
@@ -260,9 +258,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
   </div>
   <div id="onlineLobby" style="display:none;margin-top:16px">
    <p>ルームコード：<span class="online-code" id="onlineRoomCodeView"></span></p>
-   <p>参加者（人間プレイヤーのみ）</p><ol id="onlinePlayers"></ol>
+   <p>参加者（最大4人）</p><ol id="onlinePlayers"></ol>
    <p class="subtle" id="onlineLobbyStatus">参加者を待っています。</p>
-   <button id="startOnlineGameBtn" style="display:none;width:100%;margin-top:10px">ゲーム開始（全員そろったら開始）</button>
+   <button id="startOnlineGameBtn" style="display:none;width:100%;margin-top:10px">ゲーム開始（CPUで4人に補充）</button>
   </div>
   <p id="onlineError" role="status" style="color:#ffb6a9;min-height:24px"></p>
   <div class="online-actions"><button id="closeOnlineModal" style="background:#244753">閉じる</button></div>
@@ -274,7 +272,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <div class="online-game-top"><h2 id="onlineGameTitle" style="margin:0">オンライン対戦</h2><span id="onlineGameRoom" class="online-code"></span></div>
   <div class="online-game-status" id="onlineGameStatus">ゲーム準備中</div>
   <div class="online-game-players" id="onlineGamePlayers"></div>
-  <h3 style="margin:8px 0">場のカード</h3><div class="online-game-table" id="onlineGameTable">まだカードはありません</div>
+  <h3 style="margin:8px 0">場のカード</h3><div class="online-game-table" id="onlineGameTable">まだカードはありません</div><button type="button" id="onlineShowFieldCards" style="margin-top:8px;background:#315b65">この場で出されたカード一覧</button>
   <div id="onlineQArea" style="display:none"><strong>Qボンバー：破壊する数字を選択</strong><div class="online-q-options" id="onlineQOptions"></div></div>
   <h3 style="margin:8px 0">あなたの手札 <span class="subtle" id="onlineHandCount"></span></h3><div class="online-game-hand" id="onlineGameHand"></div>
   <div class="online-game-actions"><button id="onlinePlayBtn">選択したカードを出す</button><button id="onlinePassBtn">パス</button><button id="onlineClearBtn" style="background:#44535a">選択解除</button><button id="onlineExitGameBtn" style="background:#244753">閉じる</button></div>
@@ -1417,10 +1415,12 @@ document.getElementById('tableCards').setAttribute('aria-label','この場で出
 function openFieldPopup(){
  const box=document.getElementById('fieldPopupCards');
  box.innerHTML='';
- if(!state.trickCards||!state.trickCards.length){
+ const onlineHistory=(selectedMode==='online'&&onlineGameData)?(onlineGameData.trickHistory||[]):null;
+ const history=onlineHistory||state.trickCards||[];
+ if(!history.length){
   box.textContent='この場で出されたカードはまだありません。';
  }else{
-  state.trickCards.forEach(entry=>{
+  history.forEach(entry=>{
    const row=document.createElement('div');
    row.style.width='100%';
    row.style.marginBottom='12px';
@@ -1434,7 +1434,7 @@ function openFieldPopup(){
    cardsRow.style.justifyContent='center';
    cardsRow.style.flexWrap='wrap';
    cardsRow.style.gap='5px';
-   entry.cards.forEach(c=>cardsRow.append(cardEl(c)));
+   entry.cards.forEach(c=>cardsRow.append(onlineHistory?makeOnlineCard(c,false,null):cardEl(c)));
    row.append(cardsRow);
    box.append(row);
   });
@@ -1469,8 +1469,7 @@ let onlineRoomCode = null;
 let onlineIsHost = false;
 let onlineGameData = null;
 let onlineSelected = new Set();
-let onlineSeenLogs = new Set();
-let onlinePlayerCount = 4;
+let lastOnlineFourStopSerial = 0;
 function openOnlineModal(){
  const modal=document.getElementById('onlineModal');modal.classList.add('open');document.getElementById('onlineError').textContent='';
  if(!onlineSocket){
@@ -1478,7 +1477,7 @@ function openOnlineModal(){
   onlineSocket=io(ONLINE_SERVER_URL,{transports:['websocket','polling']});
   onlineSocket.on('connect_error',()=>{document.getElementById('onlineError').textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
   onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
-  onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);});
+  onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}});
   onlineSocket.on('onlineActionError',msg=>{document.getElementById('onlineGameStatus').textContent=msg;});
   onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。';resetOnlineLobby();});
  }
@@ -1486,17 +1485,17 @@ function openOnlineModal(){
 function renderOnlinePlayers(players){
  const list=document.getElementById('onlinePlayers');list.innerHTML='';
  (players||[]).forEach(p=>{const li=document.createElement('li');li.textContent=p.name+(p.isCPU?'（CPU）':'');list.appendChild(li);});
- const total=onlinePlayerCount||Number(document.getElementById('onlinePlayerCount').value)||4;document.getElementById('onlineLobbyStatus').textContent=(players||[]).length+'/'+total+' 人が参加中。CPUは参加せず、全員そろうと開始できます。';document.getElementById('startOnlineGameBtn').disabled=(players||[]).length!==total;document.getElementById('startOnlineGameBtn').textContent=(players||[]).length===total?'ゲーム開始':'参加者待ち（'+(players||[]).length+'/'+total+'人）';
+ document.getElementById('onlineLobbyStatus').textContent=(players||[]).length+'/4 人が参加中。ゲーム開始すると不足人数はCPUになります。';
 }
-function resetOnlineLobby(){onlineRoomCode=null;onlineIsHost=false;onlinePlayerCount=4;document.getElementById('onlinePlayerCount').disabled=false;document.getElementById('onlineLobby').style.display='none';document.getElementById('startOnlineGameBtn').style.display='none';}
+function resetOnlineLobby(){onlineRoomCode=null;onlineIsHost=false;document.getElementById('onlineLobby').style.display='none';document.getElementById('startOnlineGameBtn').style.display='none';}
 function onlineRequest(eventName,payload){
  const error=document.getElementById('onlineError');error.textContent='';if(!onlineSocket){openOnlineModal();}if(!onlineSocket)return;
  if(!onlineSocket.connected){error.textContent='サーバーへ接続中です。少し待ってからもう一度試してください。';return;}
  onlineSocket.emit(eventName,payload,result=>{if(!result||!result.ok){error.textContent=result?.message||'処理に失敗しました。';return;}
-  onlineRoomCode=result.roomCode;onlineIsHost=!!result.isHost;onlinePlayerCount=Number(result.playerCount)||onlinePlayerCount;document.getElementById('onlinePlayerCount').value=String(onlinePlayerCount);document.getElementById('onlinePlayerCount').disabled=true;document.getElementById('onlineRoomCodeView').textContent=result.roomCode;document.getElementById('onlineLobby').style.display='block';document.getElementById('startOnlineGameBtn').style.display=onlineIsHost?'block':'none';renderOnlinePlayers(result.players||[]);
+  onlineRoomCode=result.roomCode;onlineIsHost=!!result.isHost;document.getElementById('onlineRoomCodeView').textContent=result.roomCode;document.getElementById('onlineLobby').style.display='block';document.getElementById('startOnlineGameBtn').style.display=onlineIsHost?'block':'none';renderOnlinePlayers(result.players||[]);
  });
 }
-document.getElementById('createOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6);if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}onlineRequest('createRoom',{name,playerCount:Number(document.getElementById('onlinePlayerCount').value)});});
+document.getElementById('createOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6);if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}onlineRequest('createRoom',{name});});
 document.getElementById('joinOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6),roomCode=document.getElementById('onlineRoomCode').value.trim().toUpperCase();if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}if(!roomCode){document.getElementById('onlineError').textContent='参加コードを入力してください。';return;}onlineRequest('joinRoom',{name,roomCode});});
 document.getElementById('startOnlineGameBtn').addEventListener('click',()=>{if(!onlineSocket||!onlineSocket.connected){document.getElementById('onlineError').textContent='サーバーに接続されていません。';return;}onlineSocket.emit('startOnlineGame',{},result=>{if(!result?.ok)document.getElementById('onlineError').textContent=result?.message||'ゲームを開始できません。';else document.getElementById('onlineModal').classList.remove('open');});});
 document.getElementById('closeOnlineModal').addEventListener('click',()=>document.getElementById('onlineModal').classList.remove('open'));
@@ -1504,13 +1503,10 @@ document.getElementById('onlineModal').addEventListener('click',e=>{if(e.target.
 function onlineCardLabel(c){return c.rank===16?'JOKER':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[c.rank]||String(c.rank))+c.suit;}
 function makeOnlineCard(c,selected,click){const b=document.createElement('button');b.type='button';b.className='online-card'+(('♥♦'.includes(c.suit))?' red':'')+(selected?' selected':'');const corner=document.createElement('span');corner.textContent=c.rank===16?'★':onlineCardLabel(c);const big=document.createElement('span');big.className='big';big.textContent=c.rank===16?'★':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[c.rank]||String(c.rank));const bottom=document.createElement('span');bottom.textContent=c.suit;b.append(corner,big,bottom);if(click)b.addEventListener('click',click);return b;}
 function renderOnlineGame(g){
- if((g.logs||[]).some(line=>line.includes('ゲーム開始'))&&g.logs.length<3)onlineSeenLogs.clear();
- const freshLogs=(g.logs||[]).filter(line=>!onlineSeenLogs.has(line));
- freshLogs.forEach(line=>{onlineSeenLogs.add(line);if(line.includes('4止め'))showFourStopBubble();if(line.includes('革命！')||line.includes('革命返し！'))showRevolutionAnimation(line.includes('革命！')&&!line.includes('革命返し！'));if(line.includes('Jバック')&&line.includes('発動'))showJJBubble();});
  const modal=document.getElementById('onlineGameModal');modal.classList.add('open');document.getElementById('onlineGameRoom').textContent=onlineRoomCode||'';
  const current=g.players[g.turn];let status=g.finished?'ゲーム終了：'+(g.finishOrder||[]).join(' → '):g.pendingQ?(g.pendingQ.mine?'Qボンバーの数字を選択してください':'Qボンバー処理中'):((g.myTurn?'あなたのターン':`${current?.name||'相手'}のターン`)+(g.firstMove?'（♦3を出して開始）':''));
- document.getElementById('onlineGameStatus').textContent=(g.notice||status)+((g.effects&&g.effects.length)?'　｜　'+[...new Set(g.effects)].join(' / '):'')+(g.jBack?'　｜　Jバック':'')+(g.revolution?'　｜　革命':'')+(g.lockSuit?'　｜　縛り '+g.lockSuit:'');
- const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.disconnected?'（切断）':'');const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・上がり`: `手札 ${p.handCount}枚`;d.append(b,sm);ps.append(d);});
+ document.getElementById('onlineGameStatus').textContent=g.notice||status;
+ const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・上がり`: `手札 ${p.handCount}枚`;d.append(b,sm);ps.append(d);});
  const table=document.getElementById('onlineGameTable');table.innerHTML='';if(g.table?.length)g.table.forEach(c=>table.append(makeOnlineCard(c,false,null)));else table.textContent='場にカードはありません';
  const hand=document.getElementById('onlineGameHand');hand.innerHTML='';const myHand=g.myHand||[];document.getElementById('onlineHandCount').textContent=`${myHand.length}枚`;
  myHand.forEach(c=>hand.append(makeOnlineCard(c,onlineSelected.has(c.id),()=>{if(!g.myTurn||g.pendingQ||g.finished)return;if(onlineSelected.has(c.id))onlineSelected.delete(c.id);else onlineSelected.add(c.id);renderOnlineGame(g);} )));
@@ -1522,6 +1518,7 @@ document.getElementById('onlinePlayBtn').addEventListener('click',()=>{if(!onlin
 document.getElementById('onlinePassBtn').addEventListener('click',()=>{onlineSelected.clear();onlineSocket?.emit('onlinePass',{},()=>{});});
 document.getElementById('onlineClearBtn').addEventListener('click',()=>{onlineSelected.clear();if(onlineGameData)renderOnlineGame(onlineGameData);});
 document.getElementById('onlineExitGameBtn').addEventListener('click',()=>document.getElementById('onlineGameModal').classList.remove('open'));
+document.getElementById('onlineShowFieldCards').addEventListener('click',()=>{if(onlineGameData){openFieldPopup();}});
 
 newGame();
 </script>
