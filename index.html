@@ -512,8 +512,24 @@ function clearTrick(startIndex){
  state.lastPlayer=-1;
  state.eightCutPending=false;
  state.downNumberBaseRank=null;
- state.turn=startIndex;
- log('場が流れました。'+state.players[startIndex].name+'から再開。');
+
+ // 最後に出した人が上がっていた場合、その人のターンには戻さず、
+ // 次に残っているプレイヤーから再開する。
+ let next=startIndex;
+ if(!state.players[next]||state.players[next].finished||state.players[next].hand.length===0){
+  let found=false;
+  for(let step=1;step<=state.players.length;step++){
+   const idx=(startIndex+step)%state.players.length;
+   if(!state.players[idx].finished&&state.players[idx].hand.length>0){
+    next=idx;
+    found=true;
+    break;
+   }
+  }
+  if(!found){state.finished=true;render();return;}
+ }
+ state.turn=next;
+ log('場が流れました。'+state.players[next].name+'から再開。');
 }
 
 function finishIfNeeded(p){
@@ -1155,10 +1171,25 @@ function cpuTurn(){
    // これをしないと「単独カード優先」の並び替えでCPUがペアをほぼ出さなかった。
    const effectRanks=[7,8,10,12];
    options.sort((a,b)=>{
+    // K・A・2は強いカードとして扱い、ほかに出せる候補があれば極力温存する。
+    // 階段や複数枚出しに含まれる場合も、使用枚数分を評価する。
+    const aStrong=a.filter(c=>[13,14,15].includes(c.rank)).length;
+    const bStrong=b.filter(c=>[13,14,15].includes(c.rank)).length;
+    if(aStrong!==bStrong)return aStrong-bStrong;
+
     const aEffect=a.length>1&&a.every(c=>c.rank===a[0].rank)&&effectRanks.includes(a[0].rank)?1:0;
     const bEffect=b.length>1&&b.every(c=>c.rank===b[0].rank)&&effectRanks.includes(b[0].rank)?1:0;
     if(aEffect!==bEffect)return bEffect-aEffect;
     if(aEffect&&bEffect&&a.length!==b.length)return b.length-a.length;
+
+    // ダウンナンバー条件を満たす同じマークの1つ下のカードをCPUも候補として優先する。
+    const isDownNumber=(cards)=>state.table.length===1&&cards.length===1&&
+     state.downNumberBaseRank===null&&cards[0].rank!==16&&state.table[0].rank!==16&&
+     cards[0].suit===state.table[0].suit&&cards[0].rank===state.table[0].rank-1;
+    const aDown=isDownNumber(a)?1:0;
+    const bDown=isDownNumber(b)?1:0;
+    if(aDown!==bDown)return bDown-aDown;
+
     // CPUは4・6のような弱いカードを基本的に温存し、他の候補がなければ出す。
     const aWeak=a.length===1&&[4,6].includes(a[0].rank)?1:0;
     const bWeak=b.length===1&&[4,6].includes(b[0].rank)?1:0;
