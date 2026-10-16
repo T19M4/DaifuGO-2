@@ -248,6 +248,10 @@ const rankPower=r=>{
 };
 const cardText=c=>c.rank===16?'JOKER':rankName(c.rank)+c.suit;
 
+// Jバック中のダウンナンバー特例：J→Q→K→A→2を同じマークでつなげる。
+const JBACK_DOWN_ORDER=[11,12,13,14,15];
+const isJBackDownStep=(previous,next)=>!!(state&&state.jBack&&previous&&next&&previous.rank!==16&&next.rank!==16&&previous.suit===next.suit&&JBACK_DOWN_ORDER.indexOf(next.rank)===JBACK_DOWN_ORDER.indexOf(previous.rank)+1&&JBACK_DOWN_ORDER.includes(previous.rank));
+
 const cardEl=(c,extra='')=>{
  let d=document.createElement('div');
  d.className='card '+suitColor(c.suit)+' '+extra;
@@ -288,7 +292,7 @@ function newGame(){
 
  state={
   players,turn:start,deck:[],table:[],trickCards:[],lastCards:[],lastPlayer:-1,
-  passCount:0,selected:new Set(),jBack:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
+  passCount:0,selected:new Set(),jBack:false,jBackNineLock:false,downNumberJBackSequence:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
   finished:false,finishOrder:[],pendingQ:false,turnSerial:0,
   firstMove:true,eightCutPending:false,pendingDiscardCount:0,downNumberBaseRank:null
  };
@@ -482,9 +486,12 @@ function canBeat(cards){
  // 例：♠5→♠4の後は、♠3または♠6以上を出せる。
  if(state.downNumberBaseRank!==null){
   if(cards.length!==1 || cards[0].rank===16 || state.table.length!==1 || state.table[0].rank===16)return false;
-  const canContinueDown=cards[0].suit===state.table[0].suit && cards[0].rank===state.table[0].rank-1;
+  const sameSuit=cards[0].suit===state.table[0].suit;
+  const canContinueDown=sameSuit && (cards[0].rank===state.table[0].rank-1 || isJBackDownStep(state.table[0],cards[0]));
   const canPlayAboveBase=cards[0].rank>state.downNumberBaseRank;
-  return canContinueDown || canPlayAboveBase;
+  // J→Qで始まったJバックのダウンナンバー中は、同じマークでJバックの強さ比較に勝つカードも出せる。
+  const canPlayByJBackPower=state.downNumberJBackSequence&&state.jBack&&sameSuit&&rankPower(cards[0].rank)>rankPower(state.table[0].rank);
+  return canContinueDown || canPlayAboveBase || canPlayByJBackPower;
  }
 
  // 場にカードが1枚だけあるとき、同じマークで1つ下のカードを出せる。
@@ -492,7 +499,7 @@ function canBeat(cards){
  if(state.table.length===1 && cards.length===1 &&
     cards[0].rank!==16 && state.table[0].rank!==16 &&
     cards[0].suit===state.table[0].suit &&
-    cards[0].rank===state.table[0].rank-1){
+    (cards[0].rank===state.table[0].rank-1 || isJBackDownStep(state.table[0],cards[0]))){
   return true;
  }
 
@@ -538,6 +545,8 @@ function clearTrick(startIndex){
  state.lockSuit=null;
  state.effects=[];
  state.jBack=false;
+ state.jBackNineLock=false;
+ state.downNumberJBackSequence=false;
  state.lastPlayer=-1;
  state.eightCutPending=false;
  state.downNumberBaseRank=null;
@@ -616,7 +625,7 @@ function playCards(cards,byCpu=false){
 
  const wasFirstMove=state.firstMove;
  const fourStop=state.eightCutPending&&state.table.some(c=>c.rank===8)&&isFourStopPair(cards);
- const spadeThreeReversal=state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠';
+ const spadeThreeReversal=!state.jBackNineLock&&state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠';
  const oldTable=state.table.slice();
 
  // この場が流れるまでに出されたカードを履歴として保存する
@@ -629,8 +638,10 @@ function playCards(cards,byCpu=false){
  const downNumberPlay=state.table.length===1 && cards.length===1 &&
   cards[0].rank!==16 && state.table[0].rank!==16 &&
   cards[0].suit===state.table[0].suit &&
-  cards[0].rank===state.table[0].rank-1;
+  (cards[0].rank===state.table[0].rank-1 || isJBackDownStep(state.table[0],cards[0]));
+ const jBackDownStep=state.table.length===1&&cards.length===1&&isJBackDownStep(state.table[0],cards[0]);
  const previousDownNumberBase=state.downNumberBaseRank;
+ const wasJBackDownSequence=state.downNumberJBackSequence;
 
  removeCards(p,cards);
  state.selected.clear();
@@ -639,6 +650,7 @@ function playCards(cards,byCpu=false){
  // 例：♠5→♠4→♠3なら、♠3の後も♠6以上または♠2を出せる。
  // ダウンナンバー以外のカードが出たら通常の比較に戻す。
  state.downNumberBaseRank=downNumberPlay ? (previousDownNumberBase!==null ? previousDownNumberBase : oldTable[0].rank) : null;
+ state.downNumberJBackSequence=(jBackDownStep || (wasJBackDownSequence&&state.jBack&&oldTable.length===1&&cards.length===1&&cards[0].suit===oldTable[0].suit));
  state.lastCards=cards.slice();
  state.lastPlayMode={revolution:state.revolution,jBack:state.jBack};
  state.lastPlayer=state.turn;
@@ -679,10 +691,10 @@ function playCards(cards,byCpu=false){
   return true;
  }
 
- const suppressEffects=(state.neutralizeCount||0)>0||state.neutralizeNext;
+ const suppressEffects=(state.neutralizeCount||0)>0||state.neutralizeNext||state.jBackNineLock;
  if((state.neutralizeCount||0)>0)state.neutralizeCount--;
  state.neutralizeNext=false;
- if(suppressEffects)log('9の効果により、このカードの能力は無効');
+ if(suppressEffects)log(state.jBackNineLock?'Jバック＋9の封印により、このカードの特殊効果は無効':'9の効果により、このカードの能力は無効');
 
  if(!suppressEffects){
   const jokerSubCount=cards.some(c=>c.rank===16)&&cards.some(c=>c.rank!==16)?1:0;
@@ -757,6 +769,15 @@ function playCards(cards,byCpu=false){
    }
    return true;
   }
+ }
+
+ // Jバックが有効な状態で、同じ場の流れの中でJの後に9が出たら、
+ // Jバックは維持し、それ以降の特殊効果を場が流れるまで無効化する。
+ const jWasPlayedEarlierThisTrick=(state.trickCards||[]).slice(0,-1).some(entry=>(entry.cards||[]).some(c=>c.rank===11));
+ if(!state.jBackNineLock&&state.jBack&&jWasPlayedEarlierThisTrick&&cards.some(c=>c.rank===9)){
+  state.jBackNineLock=true;
+  state.effects.push('Jバック維持・特殊効果封印（場が流れるまで）');
+  log('Jバック＋9：Jバックは維持。以降の特殊効果は場が流れるまで無効です。');
  }
 
  // 10捨て：出した10の枚数分、捨てるカードを選択する。
