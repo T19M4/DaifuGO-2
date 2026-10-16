@@ -182,7 +182,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>Qボンバー</td><td>Qで指定した数字のカードを全員の手札から破壊する</td></tr>
 <tr><td>ダウンナンバー</td><td>場が1枚のとき、同じマークで1つ下の数字を出せる。例：♠4に♠3。その後は元の数字より大きいカード（♠5以上）を出せる。場が空なら発動しない</td></tr>
 <tr><td>縛り</td><td>場にカードがある状態で、同じマークで続けて出した場合に発生</td></tr>
-<tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる</td></tr>
+<tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる。ジョーカーで連番の欠けを1つ補える</td></tr>
+<tr><td>ジョーカー</td><td>場のカードが1枚なら条件を問わず出せる。ペア・革命・階段の不足分にも使える</td></tr>
 <tr><td>禁止上がり</td><td>2・ジョーカーなど禁止カードで上がると反則</td></tr>
 <tr><td>都落ち</td><td>この版では未実装</td></tr>
 </tbody>
@@ -287,7 +288,7 @@ function newGame(){
 
  state={
   players,turn:start,deck:[],table:[],trickCards:[],lastCards:[],lastPlayer:-1,
-  passCount:0,selected:new Set(),jBack:false,revolution:false,neutralizeNext:false,lockSuit:null,effects:[],
+  passCount:0,selected:new Set(),jBack:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
   finished:false,finishOrder:[],pendingQ:false,turnSerial:0,
   firstMove:true,eightCutPending:false,pendingDiscardCount:0,downNumberBaseRank:null
  };
@@ -428,19 +429,24 @@ function isFourStopPair(cards){
 
 function validSet(cards){
  if(!cards.length)return false;
-
- // ジョーカーは単独、または4とのペアだけ許可
- if(cards.some(c=>c.rank===16)){
-  return cards.length===1||(cards.length===2&&isFourStopPair(cards));
- }
-
+ const jokers=cards.filter(c=>c.rank===16);
+ const normal=cards.filter(c=>c.rank!==16);
  if(cards.length===1)return true;
- if(cards.every(c=>c.rank===cards[0].rank))return true;
 
- let non=cards.filter(c=>c.rank!==16);
- return non.length===cards.length&&
-  cards.every(c=>c.suit===cards[0].suit)&&
-  cards.map(c=>c.rank).sort((a,b)=>a-b).every((r,i,a)=>i===0||r===a[i-1]+1);
+ // 同じ数字の組み合わせはジョーカーを不足分の数字として扱う（最大4枚）。
+ if(normal.length&&normal.every(c=>c.rank===normal[0].rank)){
+  return cards.length<=4 && jokers.length<=1;
+ }
+ // ジョーカー2枚だけのペアも有効。
+ if(!normal.length)return cards.length===2;
+
+ // 階段：通常カードは同じマークで、ジョーカーは連続する数字の欠けを1つだけ埋める。
+ if(jokers.length!==1 || normal.length<2)return false;
+ if(!normal.every(c=>c.suit===normal[0].suit))return false;
+ const ranks=normal.map(c=>c.rank).sort((a,b)=>a-b);
+ if(new Set(ranks).size!==ranks.length)return false;
+ const span=ranks[ranks.length-1]-ranks[0]+1;
+ return span===cards.length && span<=13;
 }
 
 function canBeat(cards){
@@ -448,6 +454,8 @@ function canBeat(cards){
 
  // ♦3の初手はplayCards側で指定する
  if(!state.table.length)return true;
+ // 場のカードが1枚なら、ジョーカーは強さ・縛り・効果待ちなどの条件に関係なく出せる。
+ if(state.table.length===1&&cards.length===1&&cards[0].rank===16)return true;
 
  // 8切り待機中は、他プレイヤーが出せるのは4の2枚、または4＋ジョーカーだけ。
  // それ以外のカードで8切りを上書きすることはできない。
@@ -642,23 +650,28 @@ function playCards(cards,byCpu=false){
   return true;
  }
 
- const suppressEffects=state.neutralizeNext;
+ const suppressEffects=(state.neutralizeCount||0)>0||state.neutralizeNext;
+ if((state.neutralizeCount||0)>0)state.neutralizeCount--;
  state.neutralizeNext=false;
  if(suppressEffects)log('9の効果により、このカードの能力は無効');
 
  if(!suppressEffects){
-  if(cards.some(c=>c.rank===5)){
-   state.effects.push('5スキップ');
-   skip=1;
+  const jokerSubCount=cards.some(c=>c.rank===16)&&cards.some(c=>c.rank!==16)?1:0;
+  const effectCount=(rank)=>cards.filter(c=>c.rank===rank).length+(jokerSubCount&&cards.some(c=>c.rank===rank)?1:0);
+
+  const fiveCount=effectCount(5);
+  if(fiveCount){
+   state.effects.push('5スキップ（'+fiveCount+'回）');
+   skip=fiveCount;
   }
 
-  if(cards.some(c=>c.rank===7)){
-   state.effects.push('7渡し');
+  if(effectCount(7)>0){
+   state.effects.push('7渡し（'+effectCount(7)+'枚）');
   }
 
   // 8は一度場に残し、次の人が4止めできる機会を作る
   if(cards.some(c=>c.rank===8)){
-   const eightCount=cards.filter(c=>c.rank===8).length;
+   const eightCount=effectCount(8);
    state.effects.push('8切り（'+eightCount+'枚）');
    state.eightCutPending=true;
    log('8切り：8を'+eightCount+'枚出しました。4止めがなければ場を流します。');
@@ -666,27 +679,30 @@ function playCards(cards,byCpu=false){
 
   if(cards.some(c=>c.rank===9)){
    state.effects.push('9能力無効化');
-   state.neutralizeNext=true;
+   state.neutralizeCount=Math.max(state.neutralizeCount||0, effectCount(9));
+   state.neutralizeNext=state.neutralizeCount>0;
    // 9はJバックを解除しない。縛りも場が流れるまで継続する。
-   log('9の効果：次に出されたカードの能力を無効化（Jバック・縛りは継続）');
+   log('9の効果：次の'+effectCount(9)+'回、出されたカードの能力を無効化（Jバック・縛りは継続）');
   }
 
   if(cards.some(c=>c.rank===10)){
-   const n=cards.filter(c=>c.rank===10).length;
+   const n=effectCount(10);
    state.effects.push('10捨て（'+n+'枚）');
    state.pendingDiscardCount=n;
   }
 
-  if(cards.some(c=>c.rank===11)){
-   state.jBack=!state.jBack;
-   state.effects.push('Jバック');
-   log('Jバック：カードの強さが一時的に逆転（9では解除されない）');
-   showJJBubble();
+  if(effectCount(11)>0){
+   for(let i=0;i<effectCount(11);i++)state.jBack=!state.jBack;
+   state.effects.push('Jバック（'+effectCount(11)+'回）');
+   log('Jバック：カードの強さが一時的に逆転（'+effectCount(11)+'回分）');
+   if(effectCount(11)%2===1)showJJBubble();
   }
 
-  // 4枚以上の同数字、または同じマークの4枚以上の階段で革命
-  const sameRankRevolution=cards.length>=4&&cards.every(c=>c.rank===cards[0].rank);
-  const stairRevolution=cards.length>=4&&cards.every(c=>c.suit===cards[0].suit)&&cards.map(c=>c.rank).sort((a,b)=>a-b).every((r,i,a)=>i===0||r===a[i-1]+1);
+  // 同じ数字3枚＋ジョーカーも4枚組として革命。階段のジョーカーは欠けた数字を埋める。
+  const normalCards=cards.filter(c=>c.rank!==16);
+  const hasOneJoker=cards.filter(c=>c.rank===16).length===1;
+  const sameRankRevolution=cards.length>=4&&normalCards.length>0&&normalCards.every(c=>c.rank===normalCards[0].rank)&&cards.length<=4;
+  const stairRevolution=cards.length>=4&&hasOneJoker&&normalCards.length===cards.length-1&&normalCards.every(c=>c.suit===normalCards[0].suit)&&new Set(normalCards.map(c=>c.rank)).size===normalCards.length&&(Math.max(...normalCards.map(c=>c.rank))-Math.min(...normalCards.map(c=>c.rank))+1===cards.length);
   if(sameRankRevolution||stairRevolution){
    state.revolution=!state.revolution;
    state.effects.push(state.revolution?'革命':'革命返し');
@@ -694,10 +710,10 @@ function playCards(cards,byCpu=false){
    showRevolutionAnimation(state.revolution);
   }
 
-  if(cards.some(c=>c.rank===12)){
+  if(effectCount(12)>0){
    state.effects.push('Qボンバー');
    state.pendingQ=true;
-   state.pendingQRemaining=cards.filter(c=>c.rank===12).length;
+   state.pendingQRemaining=cards.filter(c=>c.rank===12).length+(cards.some(c=>c.rank===16)&&cards.some(c=>c.rank===12)?1:0);
    state.pendingQActor=state.turn;
    render();
    document.getElementById('notice').textContent='Qボンバー：破壊する数字を必ず宣言してください（残り'+state.pendingQRemaining+'回）';
@@ -744,7 +760,7 @@ function playCards(cards,byCpu=false){
  }
 
  // 7渡し：出した7の枚数分、カードを渡す。CPUも同じ枚数だけ実行する。
- const giveCount=cards.filter(c=>c.rank===7).length;
+ const giveCount=cards.filter(c=>c.rank===7).length+(cards.some(c=>c.rank===16)&&cards.some(c=>c.rank===7)?1:0);
  if(giveCount>0&&p.hand.length){
   if(byCpu){
    let remaining=giveCount;
@@ -1170,6 +1186,28 @@ function cpuTurn(){
      else if(arr[j].rank>run[run.length-1].rank+1)break;
      if(run.length>=3&&canBeat(run))options.push(run.slice());
     }
+   }
+   const joker=p.hand.find(c=>c.rank===16);
+   if(joker){
+    // CPUもジョーカーで1つ欠けた階段を作れるよう、同じマークのカードを組み合わせて候補化。
+    for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++){
+     const pair=[arr[i],arr[j],joker];
+     if(canBeat(pair))options.push(pair);
+     for(let k=j+1;k<arr.length;k++){
+      const four=[arr[i],arr[j],arr[k],joker];
+      if(canBeat(four))options.push(four);
+     }
+    }
+   }
+  }
+  // CPUは同ランクの3枚＋ジョーカー革命も候補にする。
+  const cpuJoker=p.hand.find(c=>c.rank===16);
+  if(cpuJoker){
+   for(const rank of RANKS){
+    const same=p.hand.filter(c=>c.rank===rank);
+    if(same.length>=1&&canBeat([same[0],cpuJoker]))options.push([same[0],cpuJoker]);
+    if(same.length>=2&&canBeat([same[0],same[1],cpuJoker]))options.push([same[0],same[1],cpuJoker]);
+    if(same.length>=3&&canBeat([same[0],same[1],same[2],cpuJoker]))options.push([same[0],same[1],same[2],cpuJoker]);
    }
   }
 
