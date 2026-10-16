@@ -244,7 +244,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>10捨て</td><td>指定された枚数のカードを捨てる（出した10の枚数分）</td></tr>
 <tr><td>Jバック</td><td>一時的にカードの強さを逆転</td></tr>
 <tr><td>Qボンバー</td><td>Qで指定した数字のカードを全員の手札から破壊する</td></tr>
-<tr><td>ダウンナンバー</td><td>場が1枚のとき、同じマークで1つ下の数字を出せる。例：♠4に♠3。その後は元の数字より大きいカード（♠5以上）を出せる。場が空なら発動しない</td></tr>
+<tr><td>ダウンナンバー</td><td>場が1枚のとき、同じスートの前後1つの数字を出せる。例：♠4には♠3または♠5。ダウンナンバー中も場の数字の前後1つを出せる。場が空なら発動しない</td></tr>
 <tr><td>縛り</td><td>場にカードがある状態で、同じマークで続けて出した場合に発生</td></tr>
 <tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる。ジョーカー1～2枚で連番の欠けを補える</td></tr>
 <tr><td>ジョーカー</td><td>場のカードが1枚なら条件を問わず出せる。ペア・革命・階段の不足分にも1～2枚使える</td></tr>
@@ -298,7 +298,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div class="online-modal" id="onlineModal" role="dialog" aria-modal="true" aria-labelledby="onlineTitle">
  <div class="online-box">
   <h2 id="onlineTitle">オンラインルーム</h2>
-  <p class="subtle">ランク戦ではアカウントが必要です。通常戦はログインなしでも遊べます。</p>
+  <p class="subtle">オンライン対戦はランク戦のみです。プレイにはログインが必要です。</p>
   <div class="account-panel" style="border:1px solid #52757b;border-radius:10px;background:#052c25">
    <strong>アカウント（ランク戦用）</strong>
    <div class="account-grid">
@@ -309,7 +309,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
    <p id="accountStatus" class="subtle" aria-live="polite">未ログイン</p><p id="accountRankView" style="margin:3px 0;font-weight:800"></p>
   </div>
   <div class="account-panel" style="border:1px solid #52757b;border-radius:10px">
-   <strong>対戦モード</strong><label style="display:flex;gap:7px;align-items:center;margin-top:5px"><input id="rankedRoomToggle" type="checkbox" style="width:auto;margin:0">ランク戦（RPが増減）</label><p class="subtle" style="margin:4px 0">2人：+200 / -200、3人：+200 / 0 / -200、4〜5人：+300 / +200 / 0 / -200 / -300</p>
+   <strong>対戦モード</strong><p style="margin:5px 0;font-weight:800;color:#ffdf71">🏆 ランク戦のみ（RPが増減）</p><p class="subtle" style="margin:4px 0">2人：+200 / -200、3人：+200 / 0 / -200、4人：+300 / +200 / -200 / -300、5人：+300 / +200 / 0 / -200 / -300</p>
   </div>
   <div class="room-settings">
    <div><label for="onlineName">プレイヤー名（最大6文字）</label><input id="onlineName" maxlength="6" autocomplete="nickname" placeholder="プレイヤー名"></div>
@@ -612,17 +612,12 @@ function canBeat(cards){
  // ジョーカーを含む出し方は縛りを無視する。それ以外は縛りに従う。
  if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
 
- // ダウンナンバー後も連続して1つ下の同じマークを出せる。
- // また、最初にダウンナンバーを受けた数字より大きいカードも出せる。
- // 例：♠5→♠4の後は、♠3または♠6以上を出せる。
+ // ダウンナンバー中は、同じスートの前後1つの数字を出せる。
  if(state.downNumberBaseRank!==null){
   if(cards.length!==1 || cards[0].rank===16 || state.table.length!==1 || state.table[0].rank===16)return false;
   const sameSuit=cards[0].suit===state.table[0].suit;
-  const canContinueDown=sameSuit && (cards[0].rank===state.table[0].rank-1 || isJBackDownStep(state.table[0],cards[0]));
-  const canPlayAboveBase=cards[0].rank>state.downNumberBaseRank;
-  // J→Qで始まったJバックのダウンナンバー中は、同じマークでJバックの強さ比較に勝つカードも出せる。
-  const canPlayByJBackPower=state.downNumberJBackSequence&&state.jBack&&sameSuit&&rankPower(cards[0].rank)>rankPower(state.table[0].rank);
-  return canContinueDown || canPlayAboveBase || canPlayByJBackPower;
+  const canContinueAdjacent=sameSuit && Math.abs(cards[0].rank-state.table[0].rank)===1;
+  return canContinueAdjacent;
  }
 
  // 場にカードが1枚だけあるとき、同じマークで1つ下のカードを出せる。
@@ -630,7 +625,7 @@ function canBeat(cards){
  if(state.table.length===1 && cards.length===1 &&
     cards[0].rank!==16 && state.table[0].rank!==16 &&
     cards[0].suit===state.table[0].suit &&
-    (cards[0].rank===state.table[0].rank-1 || isJBackDownStep(state.table[0],cards[0]))){
+    Math.abs(cards[0].rank-state.table[0].rank)===1){
   return true;
  }
 
@@ -774,7 +769,7 @@ function playCards(cards,byCpu=false){
  const downNumberPlay=state.table.length===1 && cards.length===1 &&
   cards[0].rank!==16 && state.table[0].rank!==16 &&
   cards[0].suit===state.table[0].suit &&
-  (cards[0].rank===state.table[0].rank-1 || isJBackDownStep(state.table[0],cards[0]));
+  Math.abs(cards[0].rank-state.table[0].rank)===1;
  const jBackDownStep=state.table.length===1&&cards.length===1&&isJBackDownStep(state.table[0],cards[0]);
  const previousDownNumberBase=state.downNumberBaseRank;
  const wasJBackDownSequence=state.downNumberJBackSequence;
@@ -782,8 +777,7 @@ function playCards(cards,byCpu=false){
  removeCards(p,cards);
  state.selected.clear();
  state.table=cards.slice();
- // ダウンナンバーを連続使用しても、基準は最初の場の数字のまま維持する。
- // 例：♠5→♠4→♠3なら、♠3の後も♠6以上または♠2を出せる。
+ // ダウンナンバーは同じスートの前後1つの数字で連続できる。
  // ダウンナンバー以外のカードが出たら通常の比較に戻す。
  state.downNumberBaseRank=downNumberPlay ? (previousDownNumberBase!==null ? previousDownNumberBase : oldTable[0].rank) : null;
  state.downNumberJBackSequence=(jBackDownStep || (wasJBackDownSequence&&state.jBack&&oldTable.length===1&&cards.length===1&&cards[0].suit===oldTable[0].suit));
@@ -810,7 +804,7 @@ function playCards(cards,byCpu=false){
 
  let msg=p.name+'：'+cards.map(cardText).join(' ');
  log(msg);
- if(downNumberPlay)log('ダウンナンバー！ '+cardText(oldTable[0])+'に対して'+cardText(cards[0])+'を出しました。続けて同じマークの1つ下、または最初の数字より大きいカードを出せます。');
+ if(downNumberPlay)log('ダウンナンバー！ '+cardText(oldTable[0])+'に対して'+cardText(cards[0])+'を出しました。続けて同じスートの前後1つの数字を出せます。');
 
  let clearNow=false;
  let skip=0;
@@ -1012,7 +1006,7 @@ function giveCardFromPlayer(actorIndex, cardId=null, isCpu=false){
  actor.hand=actor.hand.filter(c=>c.id!==card.id);
  const targetIndex=nextRecipient(actorIndex);
  const target=state.players[targetIndex];
- log(actor.name+'が'+cardText(card)+'を'+target.name+'に渡した');
+ // 7渡しのカード移動ログは表示しない。
 
  // 人間に渡されたカードは中央に表示し、確認後に手札へ加える。
  if(target.human){
@@ -1587,7 +1581,7 @@ function onlineRequest(eventName,payload){
  const error=document.getElementById('onlineError');error.textContent='';if(!onlineSocket){openOnlineModal();}if(!onlineSocket)return;
  if(!onlineSocket.connected){error.textContent='サーバーへ接続中です。少し待ってからもう一度試してください。';return;}
  onlineSocket.emit(eventName,payload,result=>{if(!result||!result.ok){error.textContent=result?.message||'処理に失敗しました。';return;}
-  onlineRoomCode=result.roomCode;onlineIsHost=!!result.isHost;onlineMaxPlayers=Number(result.maxPlayers)||4;onlineRankedRoom=!!result.ranked;document.getElementById('onlineModeView').textContent=onlineRankedRoom?'ランク戦：順位に応じてRPが増減します':'通常戦：RPは変動しません';document.getElementById('onlinePlayerLimitView').textContent=onlineMaxPlayers;document.getElementById('onlinePlayerLimit').disabled=true;document.getElementById('onlineRoomCodeView').textContent=result.roomCode;document.getElementById('onlineLobby').style.display='block';document.getElementById('startOnlineGameBtn').style.display=onlineIsHost?'block':'none';renderOnlinePlayers(result.players||[]);
+  onlineRoomCode=result.roomCode;onlineIsHost=!!result.isHost;onlineMaxPlayers=Number(result.maxPlayers)||4;onlineRankedRoom=!!result.ranked;document.getElementById('onlineModeView').textContent='ランク戦：順位に応じてRPが増減します';document.getElementById('onlinePlayerLimitView').textContent=onlineMaxPlayers;document.getElementById('onlinePlayerLimit').disabled=true;document.getElementById('onlineRoomCodeView').textContent=result.roomCode;document.getElementById('onlineLobby').style.display='block';document.getElementById('startOnlineGameBtn').style.display=onlineIsHost?'block':'none';renderOnlinePlayers(result.players||[]);
  });
 }
 function renderAccountStatus(message=''){
@@ -1609,8 +1603,8 @@ document.getElementById('openLeaderboardBtn').addEventListener('click',()=>{docu
 document.getElementById('refreshLeaderboardBtn').addEventListener('click',loadLeaderboard);
 document.getElementById('closeLeaderboardBtn').addEventListener('click',()=>document.getElementById('leaderboardModal').classList.remove('open'));
 document.getElementById('leaderboardModal').addEventListener('click',e=>{if(e.target.id==='leaderboardModal')e.currentTarget.classList.remove('open');});
-document.getElementById('createOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6),ranked=document.getElementById('rankedRoomToggle').checked;if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}if(ranked&&!onlineAccount){document.getElementById('onlineError').textContent='ランク戦には先にログインしてください。';return;}onlineRequest('createRoom',{name,maxPlayers:Number(document.getElementById('onlinePlayerLimit').value),ranked});});
-document.getElementById('joinOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6),roomCode=document.getElementById('onlineRoomCode').value.trim().toUpperCase();if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}if(!roomCode){document.getElementById('onlineError').textContent='参加コードを入力してください。';return;}onlineRequest('joinRoom',{name,roomCode});});
+document.getElementById('createOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6);if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}if(!onlineAccount){document.getElementById('onlineError').textContent='オンライン対戦はランク戦のみです。先にログインしてください。';return;}onlineRequest('createRoom',{name,maxPlayers:Number(document.getElementById('onlinePlayerLimit').value),ranked:true});});
+document.getElementById('joinOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6),roomCode=document.getElementById('onlineRoomCode').value.trim().toUpperCase();if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}if(!onlineAccount){document.getElementById('onlineError').textContent='オンライン対戦はランク戦のみです。先にログインしてください。';return;}if(!roomCode){document.getElementById('onlineError').textContent='参加コードを入力してください。';return;}onlineRequest('joinRoom',{name,roomCode});});
 document.getElementById('startOnlineGameBtn').addEventListener('click',()=>{if(!onlineSocket||!onlineSocket.connected){document.getElementById('onlineError').textContent='サーバーに接続されていません。';return;}onlineSocket.emit('startOnlineGame',{},result=>{if(!result?.ok)document.getElementById('onlineError').textContent=result?.message||'ゲームを開始できません。';else document.getElementById('onlineModal').classList.remove('open');});});
 document.getElementById('closeOnlineModal').addEventListener('click',()=>{document.getElementById('onlineModal').classList.remove('open');document.getElementById('onlinePlayerLimit').disabled=false;});
 document.getElementById('onlineModal').addEventListener('click',e=>{if(e.target.id==='onlineModal'){document.getElementById('onlineModal').classList.remove('open');document.getElementById('onlinePlayerLimit').disabled=false;}});
@@ -1620,7 +1614,7 @@ function makeOnlineCard(c,selected,click){const b=document.createElement('button
 function onlineRankName(rank){return rank===16?'ジョーカー':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[rank]||String(rank));}
 function showOnlineEffectToast(message){const el=document.getElementById('onlineEffectToast');if(!el)return;el.textContent=message;el.classList.remove('show');void el.offsetWidth;el.classList.add('show');}
 function renderOnlineGame(g){
- const modal=document.getElementById('onlineGameModal');modal.classList.add('open');document.getElementById('onlineGameRoom').textContent=(onlineRoomCode||'')+(g.ranked?' · ランク戦':' · 通常戦');
+ const modal=document.getElementById('onlineGameModal');modal.classList.add('open');document.getElementById('onlineGameRoom').textContent=(onlineRoomCode||'')+' · ランク戦';
  const current=g.players[g.turn];let status=g.finished?'ゲーム終了：'+(g.finishOrder||[]).join(' → '):g.pendingQ?(g.pendingQ.mine?'Qボンバーの数字を選択してください':'Qボンバー処理中'):((g.myTurn?'あなたのターン':`${current?.name||'相手'}のターン`)+(g.firstMove?'（♦3を出して開始）':''));
  document.getElementById('onlineGameStatus').textContent=g.notice||status;const rr=document.getElementById('onlineRankResult');if(g.finished){rr.style.display='block';rr.innerHTML='';const title=document.createElement('strong');title.textContent=g.ranked?'ランク戦結果':'ゲーム結果';rr.append(title);const results=g.ranked&&(g.rankResults||[]).length?(g.rankResults||[]).map(x=>({...x,placeLabel:({2:x.place===1?'上がり！':'負け',3:x.place<=2?'上がり！':'3位',4:x.place<=2?'上がり！':x.place===3?'貧民':'大貧民',5:x.place<=2?'上がり！':x.place===3?'3位':x.place===4?'貧民':'大貧民'})[g.players.length]})):(g.players||[]).map(x=>({name:x.name,place:x.place,placeLabel:x.placeLabel||`${x.place}位`,delta:0,rp:null}));results.slice().sort((a,b)=>a.place-b.place).forEach(x=>{const line=document.createElement('div');line.textContent=`${x.place}位 ${x.name}：${x.placeLabel||`${x.place}位`}${g.ranked?`　${x.delta>0?'+':''}${x.delta} RP${x.rp===null?'':`（合計 ${x.rp} RP）`}`:''}`;rr.append(line);});if(onlineAccount&&g.ranked){const me=(g.rankResults||[]).find(x=>x.rp!==null&&x.name===document.getElementById('onlineName').value.trim().slice(0,6));if(me){onlineAccount.rp=me.rp;renderAccountStatus();}}}else{rr.style.display='none';rr.innerHTML='';}const ng=document.getElementById('onlineNewGameBtn'),hint=document.getElementById('onlineNewGameHint');ng.style.display=g.finished&&onlineIsHost?'block':'none';hint.style.display=g.finished&&!onlineIsHost?'block':'none';hint.textContent=g.finished&&!onlineIsHost?'ルーム作成者がニューゲームを開始するまでお待ちください。':'';
  const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・${p.placeLabel||'上がり！'}`: `手札 ${p.handCount}枚`;d.append(b,sm);ps.append(d);});
