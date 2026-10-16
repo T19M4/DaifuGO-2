@@ -473,10 +473,14 @@ function canBeat(cards){
  // ジョーカーを含む出し方は縛りを無視する。それ以外は縛りに従う。
  if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
 
- // ダウンナンバー直後は、ダウンナンバーを受けた元の数字より大きいカードを出す。
- // 例：♠4に♠3を出した場合、次は♠5以上（数字が4より大きいカード）。
+ // ダウンナンバー後も連続して1つ下の同じマークを出せる。
+ // また、最初にダウンナンバーを受けた数字より大きいカードも出せる。
+ // 例：♠5→♠4の後は、♠3または♠6以上を出せる。
  if(state.downNumberBaseRank!==null){
-  return cards.length===1 && cards[0].rank!==16 && cards[0].rank>state.downNumberBaseRank;
+  if(cards.length!==1 || cards[0].rank===16 || state.table.length!==1 || state.table[0].rank===16)return false;
+  const canContinueDown=cards[0].suit===state.table[0].suit && cards[0].rank===state.table[0].rank-1;
+  const canPlayAboveBase=cards[0].rank>state.downNumberBaseRank;
+  return canContinueDown || canPlayAboveBase;
  }
 
  // 場にカードが1枚だけあるとき、同じマークで1つ下のカードを出せる。
@@ -608,9 +612,10 @@ function playCards(cards,byCpu=false){
  removeCards(p,cards);
  state.selected.clear();
  state.table=cards.slice();
- // ダウンナンバーを使った場合は、次に出せる数字の基準を元の場の数字に固定する。
- // それ以外のカードが出たら通常の比較に戻す。
- state.downNumberBaseRank=downNumberPlay ? oldTable[0].rank : null;
+ // ダウンナンバーを連続使用しても、基準は最初の場の数字のまま維持する。
+ // 例：♠5→♠4→♠3なら、♠3の後も♠6以上または♠2を出せる。
+ // ダウンナンバー以外のカードが出たら通常の比較に戻す。
+ state.downNumberBaseRank=downNumberPlay ? (previousDownNumberBase!==null ? previousDownNumberBase : oldTable[0].rank) : null;
  state.lastCards=cards.slice();
  state.lastPlayer=state.turn;
  state.passCount=0;
@@ -633,7 +638,7 @@ function playCards(cards,byCpu=false){
 
  let msg=p.name+'：'+cards.map(cardText).join(' ');
  log(msg);
- if(downNumberPlay)log('ダウンナンバー！ '+cardText(oldTable[0])+'に対して'+cardText(cards[0])+'を出しました。次は'+rankName(oldTable[0].rank+1)+'以上の数字を出せます。');
+ if(downNumberPlay)log('ダウンナンバー！ '+cardText(oldTable[0])+'に対して'+cardText(cards[0])+'を出しました。続けて同じマークの1つ下、または最初の数字より大きいカードを出せます。');
 
  let clearNow=false;
  let skip=0;
@@ -1228,7 +1233,7 @@ function cpuTurn(){
 
     // ダウンナンバー条件を満たす同じマークの1つ下のカードをCPUも候補として優先する。
     const isDownNumber=(cards)=>state.table.length===1&&cards.length===1&&
-     state.downNumberBaseRank===null&&cards[0].rank!==16&&state.table[0].rank!==16&&
+     cards[0].rank!==16&&state.table[0].rank!==16&&
      cards[0].suit===state.table[0].suit&&cards[0].rank===state.table[0].rank-1;
     const aDown=isDownNumber(a)?1:0;
     const bDown=isDownNumber(b)?1:0;
