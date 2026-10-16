@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -77,69 +78,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .q-hand-cards .card{width:43px;height:64px;font-size:12px}
 .q-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .q-help{color:#d7eeee;font-size:13px}
+.q-bomb-card{animation:qBombPop 1.1s ease both;outline:3px solid #ffd85a;box-shadow:0 0 22px #ffcf33}
+.q-bomb-show{background:radial-gradient(circle,#7a2020aa,transparent 72%);border-radius:14px}
+@keyframes qBombPop{0%{transform:translateY(18px) scale(.65) rotate(-8deg);opacity:0}18%{transform:translateY(0) scale(1.12) rotate(3deg);opacity:1}35%{transform:scale(1) rotate(0);opacity:1}75%{transform:scale(1.04);opacity:1}100%{transform:scale(.75);opacity:0}}
 .fourstop-bubble{position:fixed;left:50%;top:24%;transform:translate(-50%,18px) scale(.75);opacity:0;pointer-events:none;z-index:2000;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:22px;padding:16px 25px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}
 .fourstop-bubble::after{content:"";position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);border-width:17px 14px 0;border-style:solid;border-color:#ffbd45 transparent transparent}
 .fourstop-bubble.show{animation:fourstop-pop 1.8s ease both}
 @keyframes fourstop-pop{0%{opacity:0;transform:translate(-50%,18px) scale(.65)}12%{opacity:1;transform:translate(-50%,0) scale(1.08)}22%{transform:translate(-50%,0) scale(1)}78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-18px) scale(.9)}}
-
-/* Qボンバーで破壊されるカードの演出 */
-.q-bomb-stage{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:center;
-  align-items:center;
-  gap:12px;
-  width:100%;
-  padding:10px;
-}
-.q-bomb-target{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:5px;
-}
-.q-bomb-owner{
-  font-size:12px;
-  font-weight:800;
-  text-align:center;
-  color:#ffe88a;
-}
-.q-bomb-card{
-  animation:qBombDestroy 1.4s ease-in-out both;
-}
-@keyframes qBombDestroy{
-  0%{
-    opacity:0;
-    transform:translateY(25px) scale(.5) rotate(-12deg);
-  }
-  20%{
-    opacity:1;
-    transform:translateY(0) scale(1.1) rotate(0);
-  }
-  40%{
-    opacity:1;
-    transform:translateY(0) scale(1);
-  }
-  75%{
-    opacity:1;
-    transform:scale(1.05);
-    filter:brightness(1.8);
-  }
-  100%{
-    opacity:0;
-    transform:translateY(-25px) scale(.65) rotate(8deg);
-    filter:brightness(2);
-  }
-}
-.q-bomb-message{
-  width:100%;
-  text-align:center;
-  color:#ffe88a;
-  font-weight:900;
-  font-size:18px;
-  margin-bottom:5px;
-}
-
 @media(max-width:900px){.layout{grid-template-columns:1fr}.rules{order:2}.players{grid-template-columns:repeat(3,minmax(0,1fr))}.rules table{font-size:12px}}
 @media(max-width:500px){header{padding:10px}.layout{padding:0 8px 12px}.players{gap:5px}.player{padding:7px 3px;font-size:12px}.card{width:44px;height:68px;padding:4px}.card .big{font-size:21px}.hand{gap:2px}.center{gap:10px}.pile{width:90px}}
 </style>
@@ -222,14 +167,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>9能力無効化</td><td>9でカードの能力を無効化</td></tr>
 <tr><td>10捨て</td><td>指定された枚数のカードを捨てる（出した10の枚数分）</td></tr>
 <tr><td>Jバック</td><td>一時的にカードの強さを逆転</td></tr>
-<tr><td>Qボンバー</td><td>Qで指定した数字のカードを全員の手札から破壊する。Qを複数枚出すと枚数分だけ宣言する</td></tr>
+<tr><td>Qボンバー</td><td>Qで指定した数字のカードを全員の手札から破壊する</td></tr>
 <tr><td>縛り</td><td>場にカードがある状態で、同じマークで続けて出した場合に発生</td></tr>
 <tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる</td></tr>
 <tr><td>禁止上がり</td><td>2・ジョーカーなど禁止カードで上がると反則</td></tr>
 <tr><td>都落ち</td><td>この版では未実装</td></tr>
 </tbody>
 </table>
-<div class="small"><b>最初のプレイヤー：</b> ♦3を持っている人。<br>CPUはカードを出した後、4秒待ってから次の行動をします。</div>
+<div class="small"><b>最初のプレイヤー：</b> ♦3を持っている人。<br>CPUはカードを出した後、2秒待ってから次の行動をします。</div>
 <button class="rulebutton" id="hideRules">ルールを閉じる</button>
 </aside>
 </div>
@@ -254,7 +199,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div class="q-modal" id="qModal" role="dialog" aria-modal="true" aria-labelledby="qTitle">
 <div class="q-box">
 <h2 id="qTitle">Qボンバー：破壊する数字を宣言</h2>
-<p class="q-help">破壊する数字を1つ選んで「宣言する」を押してください。Qを複数枚出した場合は、枚数分だけ宣言します。</p>
+<p class="q-help">破壊する数字を必ず1つ選んで「宣言する」を押してください。手札を見るだけではゲームは進みません。</p>
 <div class="q-options" id="qOptions"></div>
 <div class="q-actions">
 <button type="button" id="qHandToggle">自分の手札を見る</button>
@@ -268,33 +213,23 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </div>
 
 <div id="fourStopBubble" class="fourstop-bubble" aria-live="polite">止め価値あり！</div>
-
 <script>
 const SUITS=['♠','♥','♦','♣'];
 const RANKS=[3,4,5,6,7,8,9,10,11,12,13,14,15];
 const rankName=r=>({11:'J',12:'Q',13:'K',14:'A',15:'2',16:'ジョーカー'}[r]||String(r));
-
-// CPUは全ランクとジョーカーをQボンバーの対象として選択できる
 const CPU_Q_RANKS=[...RANKS,16];
-
 let qSelectedRank=null;
 let pendingGive=null;
 let pendingReceivedCard=null;
 let pendingDiscard=null;
 let state;
 
-// Qボンバーのアニメーション管理
-let qBombTimer=null;
-let gameGeneration=0;
-
 const suitColor=s=>s==='♥'||s==='♦'?'red':'';
-
 const rankPower=r=>{
  let p=({3:1,4:2,5:3,6:4,7:5,8:6,9:7,10:8,11:9,12:10,13:11,14:12,15:13,16:14})[r]||r;
  let power=state.revolution?15-p:p;
  return state.jBack?15-power:power;
 };
-
 const cardText=c=>c.rank===16?'JOKER':rankName(c.rank)+c.suit;
 
 const cardEl=(c,extra='')=>{
@@ -313,27 +248,11 @@ function shuffled(a){
 }
 
 function newGame(){
- // 前のQボンバー演出が残っていればキャンセル
- gameGeneration++;
- if(qBombTimer!==null){
-  clearTimeout(qBombTimer);
-  qBombTimer=null;
- }
-
  pendingGive=null;
  pendingReceivedCard=null;
  pendingDiscard=null;
- qSelectedRank=null;
-
- const gm=document.getElementById("giveModal");
- if(gm)gm.classList.remove("open");
-
- const qm=document.getElementById("qModal");
- if(qm)qm.classList.remove("open");
-
- const receiveActions=document.getElementById('giveReceiveActions');
- if(receiveActions)receiveActions.style.display='none';
-
+ const gm=document.getElementById("giveModal"); if(gm)gm.classList.remove("open");
+ const receiveActions=document.getElementById('giveReceiveActions'); if(receiveActions)receiveActions.style.display='none';
  let deck=[];
  for(let s of SUITS)for(let r of RANKS)deck.push({suit:s,rank:r,id:s+r});
  deck.push({suit:'',rank:16,id:'joker1'},{suit:'',rank:16,id:'joker2'});
@@ -347,7 +266,6 @@ function newGame(){
  ];
 
  for(let i=0;i<deck.length;i++)players[i%4].hand.push(deck[i]);
-
  players.forEach(p=>p.hand.sort((a,b)=>a.rank-b.rank||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)));
 
  let start=players.findIndex(p=>p.hand.some(c=>c.suit==='♦'&&c.rank===3));
@@ -356,8 +274,7 @@ function newGame(){
   players,turn:start,deck:[],table:[],trickCards:[],lastCards:[],lastPlayer:-1,
   passCount:0,selected:new Set(),jBack:false,revolution:false,neutralizeNext:false,lockSuit:null,effects:[],
   finished:false,finishOrder:[],pendingQ:false,turnSerial:0,
-  firstMove:true,eightCutPending:false,pendingDiscardCount:0,
-  pendingQRemaining:0,pendingQActor:null
+  firstMove:true,eightCutPending:false,pendingDiscardCount:0
  };
 
  log('ゲーム開始。♦3を持つ'+players[start].name+'が♦3を出してスタートします。');
@@ -394,7 +311,6 @@ function activeNames(){
 
 function render(){
  if(!state)return;
-
  document.getElementById('turnLabel').textContent=current().name+(state.turn===0?'（あなた）':'');
  document.getElementById('fieldLabel').textContent=state.table.length?state.table.length+'枚出し':'場にカードはありません';
  document.getElementById('gameLabel').textContent=state.finished?'ゲーム終了':'プレイ中';
@@ -402,7 +318,6 @@ function render(){
 
  let ps=document.getElementById('players');
  ps.innerHTML='';
-
  state.players.forEach((p,i)=>{
   let d=document.createElement('div');
   d.className='player'+(i===state.turn&&!state.finished?' active':'');
@@ -412,18 +327,15 @@ function render(){
 
  let hand=document.getElementById('hand');
  hand.innerHTML='';
-
  state.players[0].hand.forEach(c=>{
   let d=cardEl(c,state.selected.has(c.id)?'selected':'');
   d.title=cardText(c);
-
   d.onclick=()=>{
    if(state.finished||state.turn!==0||state.pendingQ)return;
    if(state.selected.has(c.id))state.selected.delete(c.id);
    else state.selected.add(c.id);
    renderHandOnly();
   };
-
   hand.append(d);
  });
 
@@ -431,22 +343,18 @@ function render(){
 
  let tc=document.getElementById('tableCards');
  tc.innerHTML='';
-
  if(state.table.length)state.table.forEach(c=>tc.append(cardEl(c)));
  else tc.innerHTML='<span class="subtle">最初のカードを出そう</span>';
 
  let lc=document.getElementById('lastCard');
  lc.innerHTML='';
-
  if(state.lastCards.length)state.lastCards.forEach(c=>lc.append(cardEl(c)));
  else lc.textContent='—';
-
  document.getElementById('lastPlayer').textContent=state.lastPlayer<0?'なし':state.players[state.lastPlayer].name;
 
  let ef=document.getElementById('activeEffects');
  ef.innerHTML='';
  let names=activeNames();
-
  if(!names.length)ef.innerHTML='<span class="effect none">なし</span>';
  else names.forEach(n=>{
   let s=document.createElement('span');
@@ -467,12 +375,10 @@ function render(){
 function renderHandOnly(){
  let selected=new Set(state.selected);
  let hand=document.getElementById('hand');
-
  [...hand.children].forEach((d,i)=>{
   let c=state.players[0].hand[i];
   d.classList.toggle('selected',selected.has(c.id));
  });
-
  document.getElementById('playBtn').disabled=!selected.size||state.pendingQ;
 }
 
@@ -489,6 +395,7 @@ function isFourStopPair(cards){
 function validSet(cards){
  if(!cards.length)return false;
 
+ // ジョーカーは単独、または4とのペアだけ許可
  if(cards.some(c=>c.rank===16)){
   return cards.length===1||(cards.length===2&&isFourStopPair(cards));
  }
@@ -497,7 +404,6 @@ function validSet(cards){
  if(cards.every(c=>c.rank===cards[0].rank))return true;
 
  let non=cards.filter(c=>c.rank!==16);
-
  return non.length===cards.length&&
   cards.every(c=>c.suit===cards[0].suit)&&
   cards.map(c=>c.rank).sort((a,b)=>a-b).every((r,i,a)=>i===0||r===a[i-1]+1);
@@ -506,21 +412,25 @@ function validSet(cards){
 function canBeat(cards){
  if(!validSet(cards))return false;
 
+ // ♦3の初手はplayCards側で指定する
  if(!state.table.length)return true;
 
+ // 8切り待機中は、他プレイヤーが出せるのは4の2枚、または4＋ジョーカーだけ。
+ // それ以外のカードで8切りを上書きすることはできない。
  if(state.eightCutPending&&state.table.some(c=>c.rank===8))return isFourStopPair(cards);
 
  if(cards.length!==state.table.length)return false;
-
+ // ジョーカーは縛りに関係なく出せる。
+ // 場にジョーカーがあり、場に9が含まれていなければ♠3返しができる。
  if(state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&
     cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;
 
+ // ジョーカーを含む出し方は縛りを無視する。それ以外は縛りに従う。
  if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
 
  if(cards.length>1&&!cards.every(c=>c.rank===cards[0].rank)){
   return cards[0].rank>state.table[0].rank;
  }
-
  return rankPower(cards[0].rank)>rankPower(state.table[0].rank);
 }
 
@@ -532,7 +442,6 @@ function removeCards(p,cards){
 function advance(n=1){
  for(let k=0;k<n;k++){
   let tries=0;
-
   do{
    state.turn=(state.turn+1)%state.players.length;
    tries++;
@@ -551,7 +460,6 @@ function clearTrick(startIndex){
  state.lastPlayer=-1;
  state.eightCutPending=false;
  state.turn=startIndex;
-
  log('場が流れました。'+state.players[startIndex].name+'から再開。');
 }
 
@@ -559,7 +467,6 @@ function finishIfNeeded(p){
  if(p.hand.length===0&&!p.finished){
   let last=state.lastCards;
   let banned=last.some(c=>[15,16].includes(c.rank));
-
   if(banned){
    log(p.name+'は上がり禁止カードで反則。最後に出したカードを手札に戻します。');
    p.hand.push(...last);
@@ -578,13 +485,11 @@ function finishIfNeeded(p){
    return true;
   }
  }
-
  return false;
 }
 
 function playCards(cards,byCpu=false){
  let p=current();
-
  if(state.pendingQ)return false;
 
  if(state.firstMove){
@@ -599,27 +504,31 @@ function playCards(cards,byCpu=false){
   return false;
  }
 
+ const wasFirstMove=state.firstMove;
  const fourStop=state.eightCutPending&&state.table.some(c=>c.rank===8)&&isFourStopPair(cards);
  const spadeThreeReversal=state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠';
  const oldTable=state.table.slice();
 
+ // この場が流れるまでに出されたカードを履歴として保存する
  if(!state.trickCards)state.trickCards=[];
  state.trickCards.push({player:p.name,cards:cards.slice()});
 
+ // 場が空でなければ、前の場とのマーク一致を縛り判定に使う
  const oldLockSuit=state.lockSuit;
  const wasTableOccupied=state.table.length>0;
 
  removeCards(p,cards);
  state.selected.clear();
-
  state.table=cards.slice();
  state.lastCards=cards.slice();
  state.lastPlayer=state.turn;
  state.passCount=0;
  state.firstMove=false;
 
+ // 8への4止め以外のカードが出たら、8止め判定を終了
  if(!fourStop)state.eightCutPending=false;
 
+ // ★縛り修正：場が空だった場合は縛りを発生させない
  if(wasTableOccupied&&oldTable.length&&
     cards.length&&cards.every(c=>c.suit&&c.suit===cards[0].suit)&&
     oldTable.every(c=>c.suit&&c.suit===oldTable[0].suit)&&
@@ -631,29 +540,27 @@ function playCards(cards,byCpu=false){
   state.lockSuit=oldLockSuit&&cards.every(c=>c.suit===oldLockSuit)?oldLockSuit:null;
  }
 
- log(p.name+'：'+cards.map(cardText).join(' '));
+ let msg=p.name+'：'+cards.map(cardText).join(' ');
+ log(msg);
 
  let clearNow=false;
  let skip=0;
 
+ // 4は単独で場を流さない。指定された4止めの条件でのみ流す
  if(fourStop){
   state.effects.push('4止め');
   log('止め価値あり！ '+p.name+'が4止め！場を流し、'+p.name+'から再開します。');
   showFourStopBubble();
-
   if(finishIfNeeded(p)){render();return true}
-
   clearTrick(state.turn);
   render();
-
   if(state.turn!==0)cpuTurn();
   return true;
  }
 
  const suppressEffects=state.neutralizeNext;
  state.neutralizeNext=false;
-
- if(suppressEffects)log('9の効果により、このカードの能力を無効化します');
+ if(suppressEffects)log('9の効果により、このカードの能力は無効');
 
  if(!suppressEffects){
   if(cards.some(c=>c.rank===5)){
@@ -665,6 +572,7 @@ function playCards(cards,byCpu=false){
    state.effects.push('7渡し');
   }
 
+  // 8は一度場に残し、次の人が4止めできる機会を作る
   if(cards.some(c=>c.rank===8)){
    const eightCount=cards.filter(c=>c.rank===8).length;
    state.effects.push('8切り（'+eightCount+'枚）');
@@ -675,6 +583,7 @@ function playCards(cards,byCpu=false){
   if(cards.some(c=>c.rank===9)){
    state.effects.push('9能力無効化');
    state.neutralizeNext=true;
+   // 9はJバックを解除しない。縛りも場が流れるまで継続する。
    log('9の効果：次に出されたカードの能力を無効化（Jバック・縛りは継続）');
   }
 
@@ -690,58 +599,45 @@ function playCards(cards,byCpu=false){
    log('Jバック：カードの強さが一時的に逆転（9では解除されない）');
   }
 
+  // 4枚以上の同数字、または同じマークの4枚以上の階段で革命
   const sameRankRevolution=cards.length>=4&&cards.every(c=>c.rank===cards[0].rank);
-
-  const stairRevolution=cards.length>=4&&
-   cards.every(c=>c.suit===cards[0].suit)&&
-   cards.map(c=>c.rank).sort((a,b)=>a-b).every((r,i,a)=>i===0||r===a[i-1]+1);
-
+  const stairRevolution=cards.length>=4&&cards.every(c=>c.suit===cards[0].suit)&&cards.map(c=>c.rank).sort((a,b)=>a-b).every((r,i,a)=>i===0||r===a[i-1]+1);
   if(sameRankRevolution||stairRevolution){
    state.revolution=!state.revolution;
    state.effects.push(state.revolution?'革命':'革命返し');
    log(state.revolution?'革命！カードの強さが逆転':'革命返し！カードの強さが通常に戻る');
   }
- }
 
- // Qボンバー：出したQの枚数分、必ず宣言・破壊処理を実行する。
- // CPUは自動宣言、人間は選択画面で宣言する。
- const qCount=suppressEffects?0:cards.filter(c=>c.rank===12).length;
+  if(cards.some(c=>c.rank===12)){
+   state.effects.push('Qボンバー');
+   state.pendingQ=true;
+   state.pendingQRemaining=cards.filter(c=>c.rank===12).length;
+   state.pendingQActor=state.turn;
+   render();
+   document.getElementById('notice').textContent='Qボンバー：破壊する数字を必ず宣言してください（残り'+state.pendingQRemaining+'回）';
 
- if(qCount>0){
-  state.effects.push('Qボンバー');
-  state.pendingQ=true;
-  state.pendingQRemaining=qCount;
-  state.pendingQActor=state.turn;
-
-  render();
-
-  document.getElementById('notice').textContent=
-   'Qボンバー：破壊する数字を宣言してください（残り'+qCount+'回）';
-
-  if(byCpu){
-   const rank=CPU_Q_RANKS[Math.floor(Math.random()*CPU_Q_RANKS.length)];
-   log(p.name+'のQボンバー宣言：'+rankName(rank));
-   applyQ(rank,p);
-  }else{
-   openQModal();
+   if(byCpu){
+    const rank=CPU_Q_RANKS[Math.floor(Math.random()*CPU_Q_RANKS.length)];
+    log(p.name+'のQボンバー宣言：'+rankName(rank));
+    applyQ(rank,p);
+   }else{
+    openQModal();
+   }
+   return true;
   }
-
-  return true;
  }
 
- // 10捨て：出した10の枚数分、捨てるカードを選択する
+ // 10捨て：出した10の枚数分、捨てるカードを選択する。
  if(state.pendingDiscardCount>0){
   const requested=state.pendingDiscardCount;
   const count=Math.min(requested,p.hand.length);
   state.pendingDiscardCount=0;
-
   if(count>0){
    if(byCpu){
     for(let i=0;i<count&&p.hand.length>0;i++){
      const preferred=p.hand.filter(c=>![7,10,12,14,15,16].includes(c.rank));
      const pool=preferred.length?preferred:p.hand;
      const tossed=pool[Math.floor(Math.random()*pool.length)];
-
      p.hand=p.hand.filter(c=>c.id!==tossed.id);
      log(p.name+'が'+cardText(tossed)+'を捨てた');
     }
@@ -749,10 +645,7 @@ function playCards(cards,byCpu=false){
     pendingDiscard={actorIndex:state.turn,remaining:count,clearNow,skip,byCpu:false};
     openDiscardModal();
     render();
-
-    document.getElementById('notice').textContent=
-     '10捨て：あと'+count+'枚、捨てるカードを選んでください';
-
+    document.getElementById('notice').textContent='10捨て：あと'+count+'枚、捨てるカードを選んでください';
     return true;
    }
   }
@@ -764,17 +657,14 @@ function playCards(cards,byCpu=false){
   log('♠3返し！ジョーカーを上書きした'+p.name+'が続けて行動します');
  }
 
- // 7渡し：出した7の枚数分、カードを渡す
+ // 7渡し：出した7の枚数分、カードを渡す。CPUも同じ枚数だけ実行する。
  const giveCount=cards.filter(c=>c.rank===7).length;
-
  if(giveCount>0&&p.hand.length){
   if(byCpu){
    let remaining=giveCount;
-
    while(remaining>0&&p.hand.length>0){
     const giveResult=giveCardFromPlayer(state.turn,null,true);
     remaining--;
-
     if(giveResult==='pending'){
      pendingGive={actorIndex:state.turn,clearNow,skip,byCpu:true,remaining,waitingForReceive:true};
      return true;
@@ -784,14 +674,10 @@ function playCards(cards,byCpu=false){
    pendingGive={actorIndex:state.turn,clearNow,skip,byCpu,remaining:Math.min(giveCount,p.hand.length)};
    openGiveModal();
    render();
-
-   document.getElementById('notice').textContent=
-    '7渡し：あと'+pendingGive.remaining+'枚、渡すカードを選んでください';
-
+   document.getElementById('notice').textContent='7渡し：あと'+pendingGive.remaining+'枚、渡すカードを選んでください';
    return true;
   }
  }
-
  return continueAfterPlay(p,byCpu,clearNow,skip);
 }
 
@@ -801,7 +687,6 @@ function continueAfterPlay(p,byCpu,clearNow,skip){
  if(clearNow){
   clearTrick(state.turn);
   render();
-
   if(state.turn!==0)cpuTurn();
   return true;
  }
@@ -810,9 +695,7 @@ function continueAfterPlay(p,byCpu,clearNow,skip){
  else advance(1);
 
  render();
-
  document.getElementById('notice').textContent=byCpu?p.name+'がカードを出しました':'カードを出しました';
-
  if(state.turn!==0)cpuTurn();
  return true;
 }
@@ -820,509 +703,292 @@ function continueAfterPlay(p,byCpu,clearNow,skip){
 function nextRecipient(actorIndex){
  for(let step=1;step<state.players.length;step++){
   const idx=(actorIndex+step)%state.players.length;
-
   if(!state.players[idx].finished&&state.players[idx].hand.length>0)return idx;
  }
-
  return (actorIndex+1)%state.players.length;
 }
 
-function giveCardFromPlayer(actorIndex,cardId=null,isCpu=false){
+function giveCardFromPlayer(actorIndex, cardId=null, isCpu=false){
  const actor=state.players[actorIndex];
  if(!actor||!actor.hand.length)return false;
-
  let card;
-
- if(cardId){
-  card=actor.hand.find(c=>c.id===cardId);
- }else{
+ if(cardId){card=actor.hand.find(c=>c.id===cardId);}
+ else{
+  // CPUは7・10・Q・A・2・ジョーカーを避け、渡せるカードがなければ手札から選ぶ。
   const preferred=actor.hand.filter(c=>![7,10,12,14,15,16].includes(c.rank));
   const pool=preferred.length?preferred:actor.hand;
   card=pool[Math.floor(Math.random()*pool.length)];
  }
-
  if(!card)return false;
-
  actor.hand=actor.hand.filter(c=>c.id!==card.id);
-
  const targetIndex=nextRecipient(actorIndex);
  const target=state.players[targetIndex];
-
  log(actor.name+'が'+cardText(card)+'を'+target.name+'に渡した');
 
+ // 人間に渡されたカードは中央に表示し、確認後に手札へ加える。
  if(target.human){
   pendingReceivedCard={card,targetIndex,actorIndex};
-
   const modal=document.getElementById('giveModal');
-
   document.getElementById('giveTitle').textContent='7渡し：受け取ったカード';
-  document.getElementById('giveHelp').textContent=
-   actor.name+'から受け取ったカードです。中央のカードを確認してから手札に加えてください。';
-
+  document.getElementById('giveHelp').textContent=actor.name+'から受け取ったカードです。中央のカードを確認してから手札に加えてください。';
   const box=document.getElementById('giveCards');
   box.innerHTML='';
-
   const cardView=cardEl(card);
   cardView.style.cursor='default';
   cardView.style.width='90px';
   cardView.style.height='130px';
   cardView.querySelector('.big').style.fontSize='42px';
-
   box.append(cardView);
-
   document.getElementById('giveReceiveActions').style.display='flex';
   modal.classList.add('open');
-
   render();
-
   document.getElementById('notice').textContent='7渡し：受け取ったカードを確認してください';
-
   return 'pending';
  }
-
  target.hand.push(card);
  target.hand.sort((a,b)=>a.rank-b.rank||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit));
-
  return true;
 }
 
 function openGiveModal(){
  pendingReceivedCard=null;
-
  document.getElementById('giveTitle').textContent='7渡し：渡すカードを選択';
  document.getElementById('giveReceiveActions').style.display='none';
-
  const actorIndex=pendingGive.actorIndex;
  const actor=state.players[actorIndex];
-
  const modal=document.getElementById('giveModal');
  const cardsBox=document.getElementById('giveCards');
-
- document.getElementById('giveHelp').textContent=
-  'あと'+pendingGive.remaining+'枚選んでください。選んだカードは次のプレイヤーに渡されます。';
-
+ document.getElementById('giveHelp').textContent='あと'+pendingGive.remaining+'枚選んでください。選んだカードは次のプレイヤーに渡されます。';
  cardsBox.innerHTML='';
-
  actor.hand.forEach(c=>{
   const el=cardEl(c);
   el.title='このカードを渡す';
   el.setAttribute('role','button');
   el.setAttribute('tabindex','0');
-
   const choose=()=>completeGive(c.id);
-
   el.addEventListener('click',choose);
-  el.addEventListener('keydown',e=>{
-   if(e.key==='Enter'||e.key===' '){
-    e.preventDefault();
-    choose();
-   }
-  });
-
+  el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}});
   cardsBox.append(el);
  });
-
  modal.classList.add('open');
 }
 
 function openDiscardModal(){
  if(!pendingDiscard)return;
-
  const actor=state.players[pendingDiscard.actorIndex];
  const modal=document.getElementById('giveModal');
  const cardsBox=document.getElementById('giveCards');
-
  document.getElementById('giveTitle').textContent='10捨て：捨てるカードを選択';
- document.getElementById('giveHelp').textContent=
-  'あと'+pendingDiscard.remaining+'枚、捨てるカードを選んでください。';
-
+ document.getElementById('giveHelp').textContent='あと'+pendingDiscard.remaining+'枚、捨てるカードを選んでください。';
  document.getElementById('giveReceiveActions').style.display='none';
  cardsBox.innerHTML='';
-
  actor.hand.forEach(c=>{
   const el=cardEl(c);
   el.title='このカードを捨てる';
   el.setAttribute('role','button');
   el.setAttribute('tabindex','0');
-
   const choose=()=>completeDiscard(c.id);
-
   el.addEventListener('click',choose);
   el.addEventListener('keydown',e=>{
-   if(e.key==='Enter'||e.key===' '){
-    e.preventDefault();
-    choose();
-   }
+   if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}
   });
-
   cardsBox.append(el);
  });
-
  modal.classList.add('open');
 }
 
 function completeDiscard(cardId){
  if(!pendingDiscard)return;
-
  const pending=pendingDiscard;
  const actor=state.players[pending.actorIndex];
  const card=actor.hand.find(c=>c.id===cardId);
-
  if(!card)return;
-
  actor.hand=actor.hand.filter(c=>c.id!==cardId);
  pending.remaining--;
-
  log(actor.name+'が'+cardText(card)+'を捨てた');
-
  if(pending.remaining>0&&actor.hand.length>0){
   pendingDiscard=pending;
   openDiscardModal();
   render();
-
-  document.getElementById('notice').textContent=
-   '10捨て：あと'+pending.remaining+'枚、捨てるカードを選んでください';
-
+  document.getElementById('notice').textContent='10捨て：あと'+pending.remaining+'枚、捨てるカードを選んでください';
   return;
  }
-
  pendingDiscard=null;
  document.getElementById('giveModal').classList.remove('open');
-
  continueAfterPlay(actor,pending.byCpu,pending.clearNow,pending.skip);
 }
 
 function completeGive(cardId){
  if(!pendingGive)return;
-
  const pending=pendingGive;
  const actor=state.players[pending.actorIndex];
-
  const didGive=giveCardFromPlayer(pending.actorIndex,cardId,false);
  if(!didGive)return;
-
  pending.remaining=Math.max(0,(pending.remaining||1)-1);
-
  if(didGive==='pending'){
   pendingGive={...pending,waitingForReceive:true};
   return;
  }
-
  if(pending.remaining>0&&actor.hand.length>0){
   pendingGive=pending;
   openGiveModal();
   render();
-
-  document.getElementById('notice').textContent=
-   '7渡し：あと'+pending.remaining+'枚、渡すカードを選んでください';
-
+  document.getElementById('notice').textContent='7渡し：あと'+pending.remaining+'枚、渡すカードを選んでください';
   return;
  }
-
  pendingGive=null;
  document.getElementById('giveModal').classList.remove('open');
-
  continueAfterPlay(actor,pending.byCpu,pending.clearNow,pending.skip);
 }
 
+
 document.getElementById('receiveCardBtn').addEventListener('click',()=>{
  if(!pendingReceivedCard)return;
-
- const {card,targetIndex}=pendingReceivedCard;
+ const {card,targetIndex,actorIndex}=pendingReceivedCard;
  const target=state.players[targetIndex];
-
  target.hand.push(card);
  target.hand.sort((a,b)=>a.rank-b.rank||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit));
-
  pendingReceivedCard=null;
-
  const pending=pendingGive;
-
  document.getElementById('giveModal').classList.remove('open');
  document.getElementById('giveReceiveActions').style.display='none';
  document.getElementById('giveTitle').textContent='7渡し：渡すカードを選択';
-
  render();
-
  if(pending&&pending.remaining>0&&state.players[pending.actorIndex].hand.length>0){
   pending.waitingForReceive=false;
   pendingGive=pending;
-
   if(pending.byCpu){
    let remaining=pending.remaining;
-
    while(remaining>0&&state.players[pending.actorIndex].hand.length>0){
     const result=giveCardFromPlayer(pending.actorIndex,null,true);
     remaining--;
-
     if(result==='pending'){
      pendingGive={...pending,remaining,waitingForReceive:true};
      return;
     }
    }
-
    pendingGive=null;
    continueAfterPlay(state.players[pending.actorIndex],true,pending.clearNow,pending.skip);
   }else{
    openGiveModal();
-
-   document.getElementById('notice').textContent=
-    '7渡し：あと'+pending.remaining+'枚、渡すカードを選んでください';
+   document.getElementById('notice').textContent='7渡し：あと'+pending.remaining+'枚、渡すカードを選んでください';
   }
  }else{
   pendingGive=null;
-
-  if(pending){
-   continueAfterPlay(state.players[pending.actorIndex],pending.byCpu,pending.clearNow,pending.skip);
-  }
+  if(pending)continueAfterPlay(state.players[pending.actorIndex],pending.byCpu,pending.clearNow,pending.skip);
  }
 });
 
 function openQModal(){
  qSelectedRank=null;
-
  const modal=document.getElementById('qModal');
  const opts=document.getElementById('qOptions');
  const confirmBtn=document.getElementById('qConfirm');
  const preview=document.getElementById('qHandPreview');
-
  opts.innerHTML='';
  confirmBtn.disabled=true;
  preview.classList.remove('open');
-
  document.getElementById('qHandToggle').textContent='自分の手札を見る';
 
  const ranks=[...RANKS,16];
-
  ranks.forEach(rank=>{
   const b=document.createElement('button');
   b.type='button';
   b.textContent=rankName(rank);
-
   b.onclick=()=>{
    qSelectedRank=rank;
-
    [...opts.children].forEach(x=>x.classList.toggle('chosen',x===b));
-
    confirmBtn.disabled=false;
   };
-
   opts.appendChild(b);
  });
 
  const handBox=document.getElementById('qHandCards');
  handBox.innerHTML='';
-
  state.players[0].hand.forEach(c=>handBox.append(cardEl(c)));
-
  modal.classList.add('open');
 }
 
 document.getElementById('qHandToggle').addEventListener('click',()=>{
  const preview=document.getElementById('qHandPreview');
-
  preview.classList.toggle('open');
-
- document.getElementById('qHandToggle').textContent=
-  preview.classList.contains('open')?'手札を閉じる':'自分の手札を見る';
+ document.getElementById('qHandToggle').textContent=preview.classList.contains('open')?'手札を閉じる':'自分の手札を見る';
 });
 
 document.getElementById('qConfirm').addEventListener('click',()=>{
- if(qSelectedRank===null||!state.pendingQ)return;
-
+ if(qSelectedRank===null)return;
  const rank=qSelectedRank;
- const actorIndex=state.pendingQActor;
- const p=state.players[actorIndex];
-
  document.getElementById('qModal').classList.remove('open');
-
- qSelectedRank=null;
-
+ const p=state.players[state.pendingQActor ?? state.turn];
  applyQ(rank,p);
 });
 
-/*
- * Qボンバー本体
- *
- * 1. 対象カードを中央に表示する
- * 2. 1.4秒間アニメーションを再生する
- * 3. 対象カードを手札から削除する
- * 4. 残りのQがあれば次のボンバーを実行する
- * 5. 全て終わったら次のプレイヤーへ進む
- */
 function applyQ(rank,p){
- if(!state||!state.pendingQ)return;
-
  if(!Number.isFinite(rank)||rank<3||rank>16){
   log('Qボンバーの数字指定が無効です');
   return;
  }
 
- // 今のゲームを識別し、新しいゲーム開始後に古い処理が動かないようにする
- const thisGeneration=gameGeneration;
-
- // 表示対象を記録する。ここではまだ手札から削除しない
- const targets=[];
-
+ // 破壊するカードを先に集め、中央に表示してから手札から取り除く。
+ const destroyedCards=[];
  state.players.forEach(pl=>{
   pl.hand.forEach(c=>{
-   if(c.rank===rank){
-    targets.push({
-     card:c,
-     player:pl.name
-    });
-   }
+   if(c.rank===rank)destroyedCards.push({card:c,player:pl.name});
   });
  });
-
- // 中央のカード表示領域をQボンバー演出に切り替える
- const table=document.getElementById('tableCards');
- const notice=document.getElementById('notice');
-
- table.innerHTML='';
-
- const stage=document.createElement('div');
- stage.className='q-bomb-stage';
-
- const message=document.createElement('div');
- message.className='q-bomb-message';
- message.textContent='💥 Qボンバー！ '+rankName(rank)+'を破壊！';
-
- stage.appendChild(message);
-
- if(targets.length===0){
-  const empty=document.createElement('div');
+ state.selected.clear();
+ const tableBox=document.getElementById('tableCards');
+ tableBox.innerHTML='';
+ if(destroyedCards.length){
+  destroyedCards.forEach(({card})=>{
+   const el=cardEl(card);
+   el.classList.add('q-bomb-card');
+   tableBox.append(el);
+  });
+ }else{
+  const empty=document.createElement('span');
   empty.className='subtle';
   empty.textContent='該当するカードはありません';
-  stage.appendChild(empty);
- }else{
-  targets.forEach((target,i)=>{
-   const wrap=document.createElement('div');
-   wrap.className='q-bomb-target';
-
-   const owner=document.createElement('div');
-   owner.className='q-bomb-owner';
-   owner.textContent=target.player;
-
-   const card=cardEl(target.card,'q-bomb-card');
-
-   // カード枚数が多くても、順番に演出を表示する
-   card.style.animationDelay=Math.min(i*60,360)+'ms';
-
-   wrap.append(owner,card);
-   stage.appendChild(wrap);
-  });
+  tableBox.append(empty);
  }
+ tableBox.classList.add('q-bomb-show');
+ document.getElementById('notice').textContent='Qボンバー！ '+rankName(rank)+'を破壊！';
+ log(p.name+'のQボンバー宣言：'+rankName(rank));
 
- table.appendChild(stage);
-
- notice.textContent=
-  'Qボンバー：'+rankName(rank)+'を'+targets.length+'枚破壊！';
-
- log('Qボンバー発動：'+rankName(rank)+'の破壊演出（対象'+targets.length+'枚）');
-
- // アニメーションが終わるまでカードは手札に残す
- if(qBombTimer!==null){
-  clearTimeout(qBombTimer);
-  qBombTimer=null;
- }
-
- qBombTimer=setTimeout(()=>{
-  qBombTimer=null;
-
-  // 別のゲームに切り替わっていた場合は何もしない
-  if(!state||gameGeneration!==thisGeneration)return;
-
-  if(state.finished){
-   state.pendingQ=false;
-   state.pendingQRemaining=0;
-   render();
-   return;
-  }
-
-  // アニメーション終了後に対象の数字を手札から削除
+ // CPU・プレイヤー共通で、破壊演出を見せてから実際に除去する。
+ setTimeout(()=>{
   let destroyed=0;
-
   state.players.forEach(pl=>{
    const before=pl.hand.length;
-
    pl.hand=pl.hand.filter(c=>c.rank!==rank);
-
    destroyed+=before-pl.hand.length;
   });
+  tableBox.classList.remove('q-bomb-show');
+  state.pendingQRemaining=Math.max(0,(state.pendingQRemaining||1)-1);
+  log('Qボンバー：'+rankName(rank)+'を'+destroyed+'枚破壊');
 
-  state.selected.clear();
+  if(p.hand.length===0)finishIfNeeded(p);
+  if(state.finished){state.pendingQ=false;render();return;}
 
-  log(
-   'Qボンバー：'+rankName(rank)+
-   'を'+destroyed+'枚破壊しました'
-  );
-
-  // 破壊で手札が0枚になったプレイヤーの上がり判定
-  // 上がり禁止カードの判定には、最後に出したカードを使う
-  state.players.forEach(pl=>{
-   if(pl.hand.length===0&&!pl.finished){
-    finishIfNeeded(pl);
-   }
-  });
-
-  if(state.finished){
-   state.pendingQ=false;
-   state.pendingQRemaining=0;
-   render();
-   return;
-  }
-
-  // 今回のボンバーを1回消化
-  state.pendingQRemaining=Math.max(
-   0,(state.pendingQRemaining||1)-1
-  );
-
-  // まだQが残っている場合は、次の数字を宣言する
+  // Qを複数枚出した場合は、Qの枚数分だけ宣言と破壊を繰り返す。
   if(state.pendingQRemaining>0){
    state.pendingQ=true;
-
    render();
-
-   notice.textContent=
-    'Qボンバー：次の数字を宣言してください（残り'+
-    state.pendingQRemaining+'回）';
-
+   document.getElementById('notice').textContent='Qボンバー：次の数字を宣言してください（残り'+state.pendingQRemaining+'回）';
    if(p.human){
-    // 人間は次の数字を選択
     openQModal();
    }else{
-    // CPUは残りのQについても必ず自動宣言・発動
-    const nextRank=CPU_Q_RANKS[
-     Math.floor(Math.random()*CPU_Q_RANKS.length)
-    ];
-
+    const nextRank=CPU_Q_RANKS[Math.floor(Math.random()*CPU_Q_RANKS.length)];
     log(p.name+'のQボンバー宣言：'+rankName(nextRank));
-
     applyQ(nextRank,p);
    }
-
    return;
   }
-
-  // 全てのQボンバー処理が完了
   state.pendingQ=false;
-  state.pendingQRemaining=0;
-  state.pendingQActor=null;
-
-  render();
-
-  log('Qボンバーの処理がすべて完了しました');
-
-  // Qを出したプレイヤーの行動を終了し、次のプレイヤーへ
   advance(1);
   render();
-
-  if(state.turn!==0){
-   cpuTurn();
-  }
-
- },1400);
+  if(state.turn!==0)cpuTurn();
+ },1200);
 }
 
 function pass(byCpu=false){
@@ -1339,20 +1005,17 @@ function pass(byCpu=false){
  }
 
  state.passCount++;
-
  log(current().name+'はパス');
 
  if(state.passCount>=state.players.filter(p=>!p.finished).length-1){
   clearTrick(state.lastPlayer>=0?state.lastPlayer:state.turn);
   render();
-
   if(state.turn!==0)cpuTurn();
   return;
  }
 
  advance(1);
  render();
-
  if(state.turn!==0)cpuTurn();
 }
 
@@ -1363,99 +1026,83 @@ function cpuTurn(){
  let p=current();
 
  setTimeout(()=>{
-  if(state.finished||state.turn===0||serial!==state.turnSerial||state.pendingQ)return;
+  if(state.finished||state.turn===0||serial!==state.turnSerial)return;
 
+  // 最初の手番は必ず♦3
   if(state.firstMove){
    const diamondThree=p.hand.find(c=>c.suit==='♦'&&c.rank===3);
-
    if(diamondThree){
     playCards([diamondThree],true);
    }
-
    return;
   }
 
   let options=[];
 
-  // ジョーカーに対する♠3返し
+  // 場がジョーカー1枚だけでCPUが♠3を持っている場合、必ず♠3で上書きし、CPU自身から再開。
   if(state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)){
    const spadeThree=p.hand.find(c=>c.rank===3&&c.suit==='♠');
-
    if(spadeThree&&canBeat([spadeThree])){
     playCards([spadeThree],true);
     return;
    }
   }
 
-  // 8に対する4止め
+  // 8に対する4止めペアを優先して探す
   if(state.eightCutPending&&state.table.some(c=>c.rank===8)){
    let fours=p.hand.filter(c=>c.rank===4);
-
    if(fours.length>=2){
     playCards(fours.slice(0,2),true);
     return;
    }
-
    let four=p.hand.find(c=>c.rank===4);
    let joker=p.hand.find(c=>c.rank===16);
-
    if(four&&joker){
     playCards([four,joker],true);
     return;
    }
   }
 
-  for(let c of p.hand){
-   if(canBeat([c]))options.push([c]);
-  }
+  for(let c of p.hand)if(canBeat([c]))options.push([c]);
 
   let byRank={};
-
   p.hand.forEach(c=>(byRank[c.rank]??=[]).push(c));
-
   for(let arr of Object.values(byRank)){
+   // ペアだけでなく、同じ数字の3枚・4枚出しもCPU候補にする。
    for(let size=2;size<=Math.min(arr.length,4);size++){
     const group=arr.slice(0,size);
-
     if(canBeat(group))options.push(group);
    }
   }
 
   for(let s of SUITS){
    let arr=p.hand.filter(c=>c.suit===s&&c.rank!==16).sort((a,b)=>a.rank-b.rank);
-
    for(let i=0;i<arr.length;i++){
     let run=[arr[i]];
-
     for(let j=i+1;j<arr.length;j++){
      if(arr[j].rank===run[run.length-1].rank+1)run.push(arr[j]);
      else if(arr[j].rank>run[run.length-1].rank+1)break;
-
      if(run.length>=3&&canBeat(run))options.push(run.slice());
     }
    }
   }
 
-  // 効果カードの複数枚出しを優先する
-  const effectRanks=[7,8,10,12];
-
-  options.sort((a,b)=>{
-   const aEffect=a.length>1&&a.every(c=>c.rank===a[0].rank)&&effectRanks.includes(a[0].rank)?1:0;
-   const bEffect=b.length>1&&b.every(c=>c.rank===b[0].rank)&&effectRanks.includes(b[0].rank)?1:0;
-
-   if(aEffect!==bEffect)return bEffect-aEffect;
-
-   if(aEffect&&bEffect&&a.length!==b.length)return b.length-a.length;
-
-   return a.length-b.length||rankPower(a[0].rank)-rankPower(b[0].rank);
-  });
+  // 7・8・10・Qは複数枚を出せるなら優先し、効果をカード枚数分処理する。
+   // これをしないと「単独カード優先」の並び替えでCPUがペアをほぼ出さなかった。
+   const effectRanks=[7,8,10,12];
+   options.sort((a,b)=>{
+    const aEffect=a.length>1&&a.every(c=>c.rank===a[0].rank)&&effectRanks.includes(a[0].rank)?1:0;
+    const bEffect=b.length>1&&b.every(c=>c.rank===b[0].rank)&&effectRanks.includes(b[0].rank)?1:0;
+    if(aEffect!==bEffect)return bEffect-aEffect;
+    if(aEffect&&bEffect&&a.length!==b.length)return b.length-a.length;
+    return a.length-b.length||rankPower(a[0].rank)-rankPower(b[0].rank);
+   });
 
   if(!options.length){
    pass(true);
    return;
   }
 
-  // Qが含まれる候補を選んだ場合、playCards内で必ずQボンバーを発動
   playCards(options[0],true);
   render();
 
@@ -1468,7 +1115,6 @@ document.getElementById('playBtn').onclick=()=>{
 };
 
 document.getElementById('passBtn').onclick=()=>pass();
-
 document.getElementById('clearBtn').onclick=()=>{
  state.selected.clear();
  render();
@@ -1476,29 +1122,22 @@ document.getElementById('clearBtn').onclick=()=>{
 
 let selectedMode='offline';
 
-document.getElementById('offlineMode').onclick=()=>{
- selectedMode='offline';
+// オフラインモードは現在のCPU対戦を開始する。オンライン機能は今後実装予定。
+ document.getElementById('offlineMode').onclick=()=>{
+  selectedMode='offline';
+  document.querySelector('h1 span').textContent='～オフラインモード～';
+  log('オフラインモードを選択しました。CPUと対戦します。');
+  if(!state || state.finished){newGame();}
+ };
 
- document.querySelector('h1 span').textContent='～オフラインモード～';
-
- log('オフラインモードを選択しました。CPUと対戦します。');
-
- if(!state||state.finished){
-  newGame();
- }
-};
-
-document.getElementById('onlineMode').onclick=()=>{
- selectedMode='online';
-
- alert('オンラインモードは今後追加予定です。現在はオフラインモードで遊べます。');
-
- selectedMode='offline';
-};
+ document.getElementById('onlineMode').onclick=()=>{
+  selectedMode='online';
+  alert('オンラインモードは今後追加予定です。現在はオフラインモードで遊べます。');
+  selectedMode='offline';
+ };
 
 document.getElementById('newGame').onclick=()=>{
  if(document.getElementById('qModal').classList.contains('open'))return;
-
  if(confirm('新しいゲームを始めますか？'))newGame();
 };
 
@@ -1517,12 +1156,8 @@ document.getElementById('tableCards').setAttribute('tabindex','0');
 document.getElementById('tableCards').setAttribute('aria-label','この場で出されたカード一覧を表示');
 
 function openFieldPopup(){
- // Qボンバーの演出中は、中央の表示を変更しない
- if(state.pendingQ)return;
-
  const box=document.getElementById('fieldPopupCards');
  box.innerHTML='';
-
  if(!state.trickCards||!state.trickCards.length){
   box.textContent='この場で出されたカードはまだありません。';
  }else{
@@ -1530,32 +1165,25 @@ function openFieldPopup(){
    const row=document.createElement('div');
    row.style.width='100%';
    row.style.marginBottom='12px';
-
    const label=document.createElement('div');
    label.style.fontWeight='800';
    label.style.marginBottom='6px';
    label.textContent=entry.player+'：';
-
    row.append(label);
-
    const cardsRow=document.createElement('div');
    cardsRow.style.display='flex';
    cardsRow.style.justifyContent='center';
    cardsRow.style.flexWrap='wrap';
    cardsRow.style.gap='5px';
-
    entry.cards.forEach(c=>cardsRow.append(cardEl(c)));
-
    row.append(cardsRow);
    box.append(row);
   });
  }
-
  fieldModal.classList.add('open');
 }
 
 document.getElementById('tableCards').addEventListener('click',openFieldPopup);
-
 document.getElementById('tableCards').addEventListener('keydown',e=>{
  if(e.key==='Enter'||e.key===' '){
   e.preventDefault();
@@ -1563,10 +1191,7 @@ document.getElementById('tableCards').addEventListener('keydown',e=>{
  }
 });
 
-document.getElementById('fieldClose').addEventListener('click',()=>{
- fieldModal.classList.remove('open');
-});
-
+document.getElementById('fieldClose').addEventListener('click',()=>fieldModal.classList.remove('open'));
 fieldModal.addEventListener('click',e=>{
  if(e.target===fieldModal)fieldModal.classList.remove('open');
 });
@@ -1580,4 +1205,4 @@ document.addEventListener('keydown',e=>{
 newGame();
 </script>
 </body>
-</html>
+</html>これ縛り中でもジョーカーを出せるようにして　コードは基本変えず修正箇所だけ。終わったら全文ここに書いて
