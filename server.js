@@ -18,9 +18,29 @@ function addLog(g,msg){g.logs.push(msg); if(g.logs.length>35)g.logs.shift();}
 function active(i,g){return !!g.players[i] && !g.players[i].finished && g.players[i].hand.length>0;}
 function nextActive(from,g,steps=1){let i=from; for(let n=0;n<steps;n++){let found=-1; for(let s=1;s<=g.players.length;s++){const j=(i+s)%g.players.length;if(active(j,g)){found=j;break;}} if(found<0)return -1; i=found;} return i;}
 function clearTrick(g,start){g.table=[];g.lastCards=[];g.lastPlayer=-1;g.passCount=0;g.lockSuit=null;g.eightPending=false;g.downBase=null;g.effects=[];g.neutralizeCount=0;g.jBack=false;g.jBackNineLock=false;g.trickHistory=[];g.turn=active(start,g)?start:nextActive(start,g); if(g.turn<0)g.finished=true; addLog(g,`場が流れました。${g.players[g.turn]?.name || ''}から再開。Jバックをリセットしました。`);}
-function validSet(cards){if(!cards.length)return false;const jokers=cards.filter(c=>c.rank===16),normal=cards.filter(c=>c.rank!==16);if(cards.length===1)return true;if(normal.length&&normal.every(c=>c.rank===normal[0].rank))return cards.length<=4&&jokers.length<=2;if(!normal.length)return cards.length<=2;if(jokers.length<1||jokers.length>2||normal.length<2||!normal.every(c=>c.suit===normal[0].suit))return false;const ranks=normal.map(c=>c.rank).sort((a,b)=>a-b);return new Set(ranks).size===ranks.length&&(Math.max(...ranks)-Math.min(...ranks)<cards.length)&&cards.length<=13;}
+// 選択された順番を階段の並びとして扱い、ジョーカーにはその位置の数字を割り当てる。
+// 例：[6, Joker, 8] -> [6, 7, 8]。階段でない組み合わせは null。
+function stairRanks(cards){
+ if(!Array.isArray(cards)||cards.length<3||cards.length>13)return null;
+ const normal=cards.filter(c=>c.rank!==16);
+ if(!normal.length||!normal.every(c=>c.suit===normal[0].suit))return null;
+ const first=cards.findIndex(c=>c.rank!==16);
+ const base=cards[first].rank-first;
+ const assigned=cards.map((c,i)=>c.rank===16?base+i:c.rank);
+ if(assigned.some((r,i)=>r!==base+i||r<3||r>15))return null;
+ if(normal.some((c,i)=>normal.some((other,j)=>i!==j&&other.rank===c.rank)))return null;
+ return assigned;
+}
+function validSet(cards){
+ if(!cards.length)return false;
+ const jokers=cards.filter(c=>c.rank===16),normal=cards.filter(c=>c.rank!==16);
+ if(cards.length===1)return true;
+ if(normal.length&&normal.every(c=>c.rank===normal[0].rank))return cards.length<=4&&jokers.length<=2;
+ if(!normal.length)return cards.length<=2;
+ return stairRanks(cards)!==null;
+}
 function isJBackDownStep(previous,next,g){const order=[11,12,13,14,15];return !!(g.jBack&&previous&&next&&previous.rank!==16&&next.rank!==16&&previous.suit===next.suit&&order.indexOf(next.rank)===order.indexOf(previous.rank)+1&&order.includes(previous.rank));}
-function canBeat(cards,g){if(!validSet(cards))return false;if(g.firstMove)return cards.length===1&&cards[0].rank===3&&cards[0].suit==='♦';if(!g.table.length)return true;if(g.table.length===1&&cards.length===1&&cards[0].rank===16)return true;if(g.eightPending&&g.table.some(c=>c.rank===8))return cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));if(cards.length!==g.table.length)return false;if(!g.jBackNineLock&&g.table.some(c=>c.rank===16)&&!g.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;if(g.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==g.lockSuit))return false;if(g.downBase!==null&&cards.length===1&&g.table.length===1&&cards[0].rank!==16&&g.table[0].rank!==16){return (cards[0].suit===g.table[0].suit&&(cards[0].rank===g.table[0].rank-1||isJBackDownStep(g.table[0],cards[0],g)))||cards[0].rank>g.downBase;}if(g.table.length===1&&cards.length===1&&cards[0].rank!==16&&g.table[0].rank!==16&&cards[0].suit===g.table[0].suit&&(cards[0].rank===g.table[0].rank-1||isJBackDownStep(g.table[0],cards[0],g)))return true;const top=g.table[0].rank;return power(cards[0].rank,g)>power(top,g);}
+function canBeat(cards,g){if(!validSet(cards))return false;if(g.firstMove)return cards.length===1&&cards[0].rank===3&&cards[0].suit==='♦';if(!g.table.length)return true;if(g.table.length===1&&cards.length===1&&cards[0].rank===16)return true;if(g.eightPending&&g.table.some(c=>c.rank===8))return cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));if(cards.length!==g.table.length)return false;if(!g.jBackNineLock&&g.table.some(c=>c.rank===16)&&!g.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;const playedStair=stairRanks(cards),tableStair=stairRanks(g.table);if(playedStair&&tableStair)return power(playedStair[playedStair.length-1],g)>power(tableStair[tableStair.length-1],g);if(g.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==g.lockSuit))return false;if(g.downBase!==null&&cards.length===1&&g.table.length===1&&cards[0].rank!==16&&g.table[0].rank!==16){return (cards[0].suit===g.table[0].suit&&(cards[0].rank===g.table[0].rank-1||isJBackDownStep(g.table[0],cards[0],g)))||cards[0].rank>g.downBase;}if(g.table.length===1&&cards.length===1&&cards[0].rank!==16&&g.table[0].rank!==16&&cards[0].suit===g.table[0].suit&&(cards[0].rank===g.table[0].rank-1||isJBackDownStep(g.table[0],cards[0],g)))return true;const top=g.table[0].rank;return power(cards[0].rank,g)>power(top,g);}
 function emitGame(code){const room=rooms.get(code);if(!room||!room.game)return;const g=room.game;for(const p of room.players){const gp=g.players.find(x=>x.id===p.id);io.to(p.id).emit('onlineGameState',snapshot(g,gp));} }
 function snapshot(g,p){return {started:true,finished:g.finished,players:g.players.map(x=>({name:x.name,isCPU:x.isCPU,handCount:x.hand.length,finished:x.finished,place:x.place||0})),myHand:p?p.hand:[],turn:g.turn,table:g.table,lastCards:g.lastCards,lastPlayer:g.lastPlayer,trickHistory:(g.trickHistory||[]).map(x=>({player:x.player,cards:x.cards})),fourStopSerial:g.fourStopSerial||0,jBackSerial:g.jBackSerial||0,revolutionSerial:g.revolutionSerial||0,qBombSerial:g.qBombSerial||0,qBombEvent:g.qBombEvent||null,firstMove:g.firstMove,eightPending:g.eightPending,jBack:g.jBack,jBackNineLock:g.jBackNineLock,revolution:g.revolution,lockSuit:g.lockSuit,downBase:g.downBase,neutralizeCount:g.neutralizeCount,effects:g.effects||[],pendingQ:g.pendingQ?{actor:g.pendingQ.actor,remaining:g.pendingQ.remaining,mine:!!p&&g.players[g.pendingQ.actor]?.id===p.id}:null,pendingChoice:g.pendingChoice?{type:g.pendingChoice.type,remaining:g.pendingChoice.remaining,mine:!!p&&g.players[g.pendingChoice.actor]?.id===p.id,recipientName:g.players[g.pendingChoice.recipient]?.name||''}:null,logs:g.logs,finishOrder:g.finishOrder,notice:g.notice||'',myTurn:!!p&&g.players[g.turn]?.id===p.id&&!g.finished&&!g.pendingQ};}
 function broadcastLobby(code){const r=rooms.get(code);if(r)io.to(code).emit('playersUpdated',publicPlayers(r));}
@@ -75,29 +95,37 @@ function applyOnlineChoice(code,playerId,ids,expectedType=null){
 function doPlay(code,playerId,ids){
  const room=rooms.get(code),g=room?.game;if(!g||g.finished||g.pendingQ||g.pendingChoice)return;
  const p=g.players[g.turn];if(!p||p.id!==playerId||p.isCPU)return;
- const wanted=new Set(Array.isArray(ids)?ids:[]);const cards=p.hand.filter(c=>wanted.has(c.id));
+ const orderedIds=Array.isArray(ids)?ids:[];const wanted=new Set(orderedIds);const cards=orderedIds.map(id=>p.hand.find(c=>c.id===id)).filter(Boolean);
  if(cards.length!==wanted.size||!cards.length||!canBeat(cards,g)){io.to(playerId).emit('onlineActionError','そのカードは出せません。');return;}
  const oldTable=g.table.slice(),wasOccupied=oldTable.length>0;
  const fourStop=g.eightPending&&oldTable.some(c=>c.rank===8)&&!oldTable.some(c=>c.rank===9)&&cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));
  const down=oldTable.length===1&&cards.length===1&&cards[0].rank!==16&&oldTable[0].rank!==16&&cards[0].suit===oldTable[0].suit&&(cards[0].rank===oldTable[0].rank-1||isJBackDownStep(oldTable[0],cards[0],g));
- const oldLock=g.lockSuit,jPlayedEarlier=g.trickHistory.some(x=>x.cards.some(c=>c.rank===11));
- p.hand=p.hand.filter(c=>!wanted.has(c.id));g.table=cards;g.lastCards=cards;g.lastPlayer=g.turn;g.passCount=0;g.firstMove=false;g.downBase=down?(g.downBase!==null?g.downBase:oldTable[0].rank):null;g.trickHistory.push({player:p.name,cards:cards.slice()});
+ const oldLock=g.lockSuit,selectedStairRanks=stairRanks(cards),effectiveRanks=selectedStairRanks||cards.map(c=>c.rank),jPlayedEarlier=g.trickHistory.some(x=>(x.effectiveRanks||x.cards.map(c=>c.rank)).includes(11));
+ p.hand=p.hand.filter(c=>!wanted.has(c.id));g.table=cards;g.lastCards=cards;g.lastPlayer=g.turn;g.passCount=0;g.firstMove=false;g.downBase=down?(g.downBase!==null?g.downBase:oldTable[0].rank):null;g.trickHistory.push({player:p.name,cards:cards.slice(),effectiveRanks:effectiveRanks.slice()});
  if(wasOccupied&&oldTable.length&&cards.every(c=>c.suit&&c.suit===cards[0].suit)&&oldTable.every(c=>c.suit&&c.suit===oldTable[0].suit)&&cards[0].suit===oldTable[0].suit)g.lockSuit=cards[0].suit;else if(!wasOccupied)g.lockSuit=null;else g.lockSuit=oldLock&&cards.every(c=>c.suit===oldLock)?oldLock:null;
  addLog(g,`${p.name}：${cards.map(cardText).join(' ')}`);if(down)addLog(g,'ダウンナンバー！');
- if(!g.jBackNineLock&&g.jBack&&jPlayedEarlier&&cards.some(c=>c.rank===9)){g.jBackNineLock=true;addLog(g,'Jバック＋9：Jバックは維持。以降の特殊効果を場が流れるまで封印。');}
+ if(!g.jBackNineLock&&g.jBack&&jPlayedEarlier&&effectiveRanks.includes(9)){g.jBackNineLock=true;addLog(g,'Jバック＋9：Jバックは維持。以降の特殊効果を場が流れるまで封印。');}
  let skip=0;const suppress=g.neutralizeCount>0||g.jBackNineLock;if(g.neutralizeCount>0)g.neutralizeCount--;
  if(fourStop){g.effects.push('4止め');g.fourStopSerial=(g.fourStopSerial||0)+1;addLog(g,`止め価値あり！ ${p.name}が4止め！場を流し、${p.name}から再開します。`);if(finishCheck(g,p)){emitGame(code);return;}clearTrick(g,g.turn);g.notice='止め価値あり！ '+p.name+'から再開します。';emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}
  g.pendingActions=[];g.pendingActor=g.turn;g.pendingSkip=0;
  if(!suppress){
+  const staircaseRanks=selectedStairRanks;
+  // 階段中のジョーカーは、選択順で補った数字の効果も発動する。
+  // 例：[6, Joker, 8] は7を含むため7渡し1枚が発動。
   const jokerSub=cards.some(c=>c.rank===16)&&cards.some(c=>c.rank!==16)?1:0;
-  const count=r=>cards.filter(c=>c.rank===r).length+(jokerSub&&cards.some(c=>c.rank===r)?1:0);
+  const count=r=>staircaseRanks
+   ? staircaseRanks.filter(rank=>rank===r).length
+   : cards.filter(c=>c.rank===r).length+(jokerSub&&cards.some(c=>c.rank===r)?1:0);
   skip=count(5);if(skip)g.effects.push(`5スキップ（${skip}回）`);
   const give=count(7);if(give){g.effects.push(`7渡し（${give}枚）`);const recipient=nextActive(g.turn,g),remaining=Math.min(give,p.hand.length);if(remaining>0&&recipient>=0)g.pendingActions.push({type:'give',actor:g.turn,recipient,remaining});}
-  if(cards.some(c=>c.rank===8)){g.effects.push('8切り');g.eightPending=true;addLog(g,'8切り：4止めの機会です。');}
-  if(cards.some(c=>c.rank===9)){g.effects.push('9能力無効化');g.neutralizeCount=Math.max(g.neutralizeCount,count(9));addLog(g,`9の効果：次の${g.neutralizeCount}回の特殊効果を無効化。`);}
+  if(count(8)>0){g.effects.push(`8切り（${count(8)}枚）`);g.eightPending=true;addLog(g,'8切り：4止めの機会です。');}
+  if(count(9)>0){g.effects.push('9能力無効化');g.neutralizeCount=Math.max(g.neutralizeCount,count(9));addLog(g,`9の効果：次の${g.neutralizeCount}回の特殊効果を無効化。`);}
   const discard=count(10);if(discard){g.effects.push(`10捨て（${discard}枚）`);const remaining=Math.min(discard,p.hand.length);if(remaining>0)g.pendingActions.push({type:'discard',actor:g.turn,remaining});}
   const js=count(11);if(js)g.effects.push(`Jバック（${js}回）`);for(let k=0;k<js;k++)g.jBack=!g.jBack;if(js){if(js%2===1)g.jBackSerial=(g.jBackSerial||0)+1;addLog(g,`Jバック${js%2?'発動':'解除'}。`);}
-  const normal=cards.filter(c=>c.rank!==16),jokerCount=cards.filter(c=>c.rank===16).length;const rev=(cards.length===4&&normal.length>0&&normal.every(c=>c.rank===normal[0].rank)&&jokerCount<=2)||(cards.length>=4&&jokerCount>0&&normal.length>=2&&normal.every(c=>c.suit===normal[0].suit)&&new Set(normal.map(c=>c.rank)).size===normal.length&&(Math.max(...normal.map(c=>c.rank))-Math.min(...normal.map(c=>c.rank))<cards.length));if(rev){g.revolution=!g.revolution;g.revolutionSerial=(g.revolutionSerial||0)+1;g.effects.push(g.revolution?'革命':'革命返し');addLog(g,g.revolution?'革命！':'革命返し！');}
+  const normal=cards.filter(c=>c.rank!==16),jokerCount=cards.filter(c=>c.rank===16).length;
+  const sameRankRevolution=cards.length===4&&normal.length>0&&normal.every(c=>c.rank===normal[0].rank)&&jokerCount<=2;
+  const stairRevolution=!!staircaseRanks&&cards.length>=4;
+  if(sameRankRevolution||stairRevolution){g.revolution=!g.revolution;g.revolutionSerial=(g.revolutionSerial||0)+1;g.effects.push(g.revolution?'革命':'革命返し');addLog(g,g.revolution?'革命！':'革命返し！');}
   const qs=count(12);if(qs){g.effects.push(`Qボンバー（${qs}回）`);g.pendingActions.push({type:'q',actor:g.turn,remaining:qs});}
  }
  if(!g.jBackNineLock&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠'&&oldTable.some(c=>c.rank===16)&&!oldTable.some(c=>c.rank===9)){addLog(g,'♠3返し！');clearTrick(g,g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}
