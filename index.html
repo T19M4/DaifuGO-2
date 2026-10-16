@@ -275,10 +275,10 @@ function newGame(){
  shuffled(deck);
 
  let players=[
-  {name:'あなた',hand:[],human:true,finished:false},
-  {name:'CPU 1',hand:[],finished:false},
-  {name:'CPU 2',hand:[],finished:false},
-  {name:'CPU 3',hand:[],finished:false}
+  {name:'あなた',hand:[],human:true,finished:false,status:''},
+  {name:'CPU 1',hand:[],finished:false,status:''},
+  {name:'CPU 2',hand:[],finished:false,status:''},
+  {name:'CPU 3',hand:[],finished:false,status:''}
  ];
 
  for(let i=0;i<deck.length;i++)players[i%4].hand.push(deck[i]);
@@ -356,7 +356,8 @@ function render(){
  state.players.forEach((p,i)=>{
   let d=document.createElement('div');
   d.className='player'+(i===state.turn&&!state.finished?' active':'');
-  d.innerHTML=`<b>${p.name}</b><div>${p.finished?'上がり！':'残り '+p.hand.length+' 枚'}</div><div class="cards-back">${p.human?'':'▰ '.repeat(Math.min(p.hand.length,7))}</div>`;
+  const playerStatus=p.status|| (p.finished?'上がり！':'残り '+p.hand.length+' 枚');
+  d.innerHTML=`<b>${p.name}</b><div>${playerStatus}</div><div class="cards-back">${p.human?'':'▰ '.repeat(Math.min(p.hand.length,7))}</div>`;
   ps.append(d);
  });
 
@@ -552,16 +553,35 @@ function clearTrick(startIndex){
 
 function finishIfNeeded(p){
  if(p.hand.length===0&&!p.finished){
-  let last=state.lastCards;
-  let banned=last.some(c=>[15,16].includes(c.rank));
+  const last=state.lastCards||[];
+  // 禁止上がり：通常時は2、革命中またはJバック中は3で上がれない。
+  // 判定にはカードを出す直前の状態を使い、そのプレイヤーは敗北扱いで場から除外する。
+  const mode=state.lastPlayMode||{revolution:state.revolution,jBack:state.jBack};
+  const bannedRank=(mode.revolution||mode.jBack)?3:15;
+  const banned=last.some(c=>c.rank===bannedRank);
   if(banned){
-   log(p.name+'は上がり禁止カードで反則。最後に出したカードを手札に戻します。');
-   p.hand.push(...last);
-   p.finished=false;
-   return false;
+   p.status='禁止上がり';
+   p.forfeited=true;
+   p.finished=true;
+   p.hand=[];
+   state.finishOrder.push(p.name+'（禁止上がり）');
+   log(p.name+'は禁止上がり！ '+(bannedRank===15?'通常時の2':'革命／Jバック中の3')+'で上がったため強制敗北。手札を捨て、次のプレイヤーにターンを移します。');
+   const next=nextActiveIndex(state.turn);
+   if(next<0){
+    state.finished=true;
+    log('ゲーム終了。');
+   }else{
+    state.turn=next;
+    state.passCount=0;
+    state.selected.clear();
+    log(state.players[next].name+'のターンです。');
+    if(next!==0)setTimeout(()=>{if(!state.finished&&state.turn===next)cpuTurn();},500);
+   }
+   return true;
   }
 
   p.finished=true;
+  p.status='';
   state.finishOrder.push(p.name);
   log(p.name+'が上がり！');
 
@@ -617,6 +637,7 @@ function playCards(cards,byCpu=false){
  // ダウンナンバー以外のカードが出たら通常の比較に戻す。
  state.downNumberBaseRank=downNumberPlay ? (previousDownNumberBase!==null ? previousDownNumberBase : oldTable[0].rank) : null;
  state.lastCards=cards.slice();
+ state.lastPlayMode={revolution:state.revolution,jBack:state.jBack};
  state.lastPlayer=state.turn;
  state.passCount=0;
  state.firstMove=false;
