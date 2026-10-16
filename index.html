@@ -309,7 +309,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
    <p id="accountStatus" class="subtle" aria-live="polite">未ログイン</p><p id="accountRankView" style="margin:3px 0;font-weight:800"></p>
   </div>
   <div class="account-panel" style="border:1px solid #52757b;border-radius:10px">
-   <strong>対戦モード</strong><label style="display:flex;gap:7px;align-items:center;margin-top:5px"><input id="rankedRoomToggle" type="checkbox" style="width:auto;margin:0">ランク戦（RPが増減）</label><p class="subtle" style="margin:4px 0">1位 +300 / 2位 +200 / 中間 0 / ワースト2位 -200 / 最下位 -300</p>
+   <strong>対戦モード</strong><label style="display:flex;gap:7px;align-items:center;margin-top:5px"><input id="rankedRoomToggle" type="checkbox" style="width:auto;margin:0">ランク戦（RPが増減）</label><p class="subtle" style="margin:4px 0">2人：+200 / -200、3人：+200 / 0 / -200、4〜5人：+300 / +200 / 0 / -200 / -300</p>
   </div>
   <div class="room-settings">
    <div><label for="onlineName">プレイヤー名（最大6文字）</label><input id="onlineName" maxlength="6" autocomplete="nickname" placeholder="プレイヤー名"></div>
@@ -338,7 +338,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div class="online-game-modal" id="onlineGameModal" role="dialog" aria-modal="true" aria-labelledby="onlineGameTitle">
  <div class="online-game-box">
   <div class="online-game-top"><h2 id="onlineGameTitle" style="margin:0">オンライン対戦</h2><span id="onlineGameRoom" class="online-code"></span></div>
-  <div class="online-game-status" id="onlineGameStatus">ゲーム準備中</div><div id="onlineRankResult" style="display:none;margin:8px 0;padding:10px;border:1px solid #ffd85a;border-radius:10px;background:#052c25"></div>
+  <div class="online-game-status" id="onlineGameStatus">ゲーム準備中</div><div id="onlineRankResult" style="display:none;margin:8px 0;padding:10px;border:1px solid #ffd85a;border-radius:10px;background:#052c25"></div><button type="button" id="onlineNewGameBtn" style="display:none;width:100%;margin:8px 0;background:#ffd85a;color:#17352e;font-weight:800">ニューゲーム</button><div id="onlineNewGameHint" class="subtle" style="display:none;margin:4px 0"></div>
   <div class="online-game-players" id="onlineGamePlayers"></div>
   <h3 style="margin:8px 0">場のカード</h3><div class="online-game-table" id="onlineGameTable">まだカードはありません</div><button type="button" id="onlineShowFieldCards" style="margin-top:8px;background:#315b65">この場で出されたカード一覧</button>
   <div id="onlineQArea" style="display:none"><strong>Qボンバー：破壊する数字を選択</strong><div class="online-q-options" id="onlineQOptions"></div></div>
@@ -470,6 +470,15 @@ function activeNames(){
  return a;
 }
 
+function offlinePlaceLabel(player){
+ const n=state.players.length,place=player.place||n;
+ if(n===2)return place===1?'上がり！':'負け';
+ if(n===3)return place<=2?'上がり！':'3位';
+ if(n===4)return place<=2?'上がり！':place===3?'貧民':'大貧民';
+ if(n===5)return place<=2?'上がり！':place===3?'3位':place===4?'貧民':'大貧民';
+ return `${place}位`;
+}
+
 function render(){
  if(!state)return;
  document.getElementById('turnLabel').textContent=current().name+(state.turn===0?'（あなた）':'');
@@ -482,7 +491,7 @@ function render(){
  state.players.forEach((p,i)=>{
   let d=document.createElement('div');
   d.className='player'+(i===state.turn&&!state.finished?' active':'');
-  const playerStatus=p.status|| (p.finished?'上がり！':'残り '+p.hand.length+' 枚');
+  const playerStatus=p.status|| (state.finished&&p.place?offlinePlaceLabel(p):p.finished?offlinePlaceLabel(p):'残り '+p.hand.length+' 枚');
   d.innerHTML=`<b>${p.name}</b><div>${playerStatus}</div><div class="cards-back">${p.human?'':'▰ '.repeat(Math.min(p.hand.length,7))}</div>`;
   ps.append(d);
  });
@@ -695,6 +704,7 @@ function finishIfNeeded(p){
   const banned=last.some(c=>c.rank===bannedRank);
   if(banned){
    p.status='禁止上がり';
+   p.place=state.players.length;
    p.forfeited=true;
    p.finished=true;
    p.hand=[];
@@ -715,14 +725,18 @@ function finishIfNeeded(p){
   }
 
   p.finished=true;
+  p.place=state.players.filter(x=>x.finished&&!x.forfeited).length;
   p.status='';
   state.finishOrder.push(p.name);
-  log(p.name+'が上がり！');
+  log(p.name+'が'+p.place+'位で'+offlinePlaceLabel(p));
 
   if(state.players.filter(x=>!x.finished).length<=1){
    state.finished=true;
    let loser=state.players.find(x=>!x.finished);
-   if(loser)log('ゲーム終了。最後まで残ったのは'+loser.name+'。');
+   if(loser){loser.place=state.players.length-state.players.filter(x=>x.forfeited).length;loser.finished=true;log('最後まで残った'+loser.name+'は'+loser.place+'位：'+offlinePlaceLabel(loser));}
+   state.players.forEach(x=>{if(!x.place)x.place=state.players.length;});
+   state.finishOrder=state.players.slice().sort((a,b)=>(a.place||state.players.length)-(b.place||state.players.length)).map(x=>x.name+'（'+x.place+'位・'+offlinePlaceLabel(x)+'）');
+   log('ゲーム終了：'+state.finishOrder.join(' → '));
    return true;
   }
  }
@@ -1608,8 +1622,8 @@ function showOnlineEffectToast(message){const el=document.getElementById('online
 function renderOnlineGame(g){
  const modal=document.getElementById('onlineGameModal');modal.classList.add('open');document.getElementById('onlineGameRoom').textContent=(onlineRoomCode||'')+(g.ranked?' · ランク戦':' · 通常戦');
  const current=g.players[g.turn];let status=g.finished?'ゲーム終了：'+(g.finishOrder||[]).join(' → '):g.pendingQ?(g.pendingQ.mine?'Qボンバーの数字を選択してください':'Qボンバー処理中'):((g.myTurn?'あなたのターン':`${current?.name||'相手'}のターン`)+(g.firstMove?'（♦3を出して開始）':''));
- document.getElementById('onlineGameStatus').textContent=g.notice||status;const rr=document.getElementById('onlineRankResult');if(g.finished&&g.ranked){rr.style.display='block';rr.innerHTML='';const title=document.createElement('strong');title.textContent='ランク戦結果';rr.append(title);(g.rankResults||[]).slice().sort((a,b)=>a.place-b.place).forEach(x=>{const line=document.createElement('div');line.textContent=`${x.place}位 ${x.name}：${x.delta>0?'+':''}${x.delta} RP${x.rp===null?'':`（合計 ${x.rp} RP）`}`;rr.append(line);});if(onlineAccount){const me=(g.rankResults||[]).find(x=>x.rp!==null&&x.name===document.getElementById('onlineName').value.trim().slice(0,6));if(me){onlineAccount.rp=me.rp;renderAccountStatus();}}}else{rr.style.display='none';rr.innerHTML='';}
- const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・上がり`: `手札 ${p.handCount}枚`;d.append(b,sm);ps.append(d);});
+ document.getElementById('onlineGameStatus').textContent=g.notice||status;const rr=document.getElementById('onlineRankResult');if(g.finished){rr.style.display='block';rr.innerHTML='';const title=document.createElement('strong');title.textContent=g.ranked?'ランク戦結果':'ゲーム結果';rr.append(title);const results=g.ranked&&(g.rankResults||[]).length?(g.rankResults||[]).map(x=>({...x,placeLabel:({2:x.place===1?'上がり！':'負け',3:x.place<=2?'上がり！':'3位',4:x.place<=2?'上がり！':x.place===3?'貧民':'大貧民',5:x.place<=2?'上がり！':x.place===3?'3位':x.place===4?'貧民':'大貧民'})[g.players.length]})):(g.players||[]).map(x=>({name:x.name,place:x.place,placeLabel:x.placeLabel||`${x.place}位`,delta:0,rp:null}));results.slice().sort((a,b)=>a.place-b.place).forEach(x=>{const line=document.createElement('div');line.textContent=`${x.place}位 ${x.name}：${x.placeLabel||`${x.place}位`}${g.ranked?`　${x.delta>0?'+':''}${x.delta} RP${x.rp===null?'':`（合計 ${x.rp} RP）`}`:''}`;rr.append(line);});if(onlineAccount&&g.ranked){const me=(g.rankResults||[]).find(x=>x.rp!==null&&x.name===document.getElementById('onlineName').value.trim().slice(0,6));if(me){onlineAccount.rp=me.rp;renderAccountStatus();}}}else{rr.style.display='none';rr.innerHTML='';}const ng=document.getElementById('onlineNewGameBtn'),hint=document.getElementById('onlineNewGameHint');ng.style.display=g.finished&&onlineIsHost?'block':'none';hint.style.display=g.finished&&!onlineIsHost?'block':'none';hint.textContent=g.finished&&!onlineIsHost?'ルーム作成者がニューゲームを開始するまでお待ちください。':'';
+ const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・${p.placeLabel||'上がり！'}`: `手札 ${p.handCount}枚`;d.append(b,sm);ps.append(d);});
  const table=document.getElementById('onlineGameTable');table.innerHTML='';if(g.table?.length)g.table.forEach(c=>table.append(makeOnlineCard(c,false,null)));else table.textContent='場にカードはありません';
  const effectBox=document.getElementById('onlineActiveEffects');effectBox.innerHTML='';const effectNames=[...(g.jBack?['Jバック（強さ逆転）']:[]),...(g.revolution?['革命（強さ逆転）']:[]),...(g.lockSuit?['縛り（'+g.lockSuit+'）']:[]),...((g.effects||[]))];if(g.jBackNineLock)effectNames.push('Jバック維持・特殊効果封印');if(g.neutralizeCount>0)effectNames.push('9能力無効化（残り'+g.neutralizeCount+'回）');if(effectNames.length){[...new Set(effectNames)].forEach(name=>{const chip=document.createElement('span');chip.className='online-effect-chip';chip.textContent=name;effectBox.append(chip);});}else effectBox.innerHTML='<span class="subtle">なし</span>';
  const hand=document.getElementById('onlineGameHand');hand.innerHTML='';const myHand=g.myHand||[];document.getElementById('onlineHandCount').textContent=`${myHand.length}枚`;
@@ -1624,6 +1638,7 @@ document.getElementById('onlineChoiceConfirm').addEventListener('click',()=>{if(
 document.getElementById('onlinePassBtn').addEventListener('click',()=>{onlineSelected.clear();onlineSocket?.emit('onlinePass',{},()=>{});});
 document.getElementById('onlineClearBtn').addEventListener('click',()=>{onlineSelected.clear();if(onlineGameData)renderOnlineGame(onlineGameData);});
 document.getElementById('onlineExitGameBtn').addEventListener('click',()=>document.getElementById('onlineGameModal').classList.remove('open'));
+document.getElementById('onlineNewGameBtn').addEventListener('click',()=>{if(!onlineIsHost||!onlineSocket||!onlineSocket.connected)return;const btn=document.getElementById('onlineNewGameBtn');btn.disabled=true;onlineSocket.emit('startOnlineGame',{},result=>{btn.disabled=false;if(!result?.ok)document.getElementById('onlineGameStatus').textContent=result?.message||'ニューゲームを開始できません。';});});
 document.getElementById('onlineShowFieldCards').addEventListener('click',()=>{if(!onlineGameData)return;const box=document.getElementById('fieldPopupCards');box.innerHTML='';const history=onlineGameData.trickHistory||[];if(!history.length){box.textContent='この場で出されたカードはまだありません。';}else{history.forEach(entry=>{const row=document.createElement('div');row.style.width='100%';row.style.marginBottom='12px';const label=document.createElement('div');label.style.fontWeight='800';label.style.marginBottom='6px';label.textContent=entry.player+'：';row.append(label);const cardsRow=document.createElement('div');cardsRow.style.display='flex';cardsRow.style.flexWrap='wrap';cardsRow.style.gap='5px';(entry.cards||[]).forEach(c=>cardsRow.append(cardEl(c)));row.append(cardsRow);box.append(row);});}document.getElementById('fieldModal').classList.add('open');});
 
 newGame();
