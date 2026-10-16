@@ -182,8 +182,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>Qボンバー</td><td>Qで指定した数字のカードを全員の手札から破壊する</td></tr>
 <tr><td>ダウンナンバー</td><td>場が1枚のとき、同じマークで1つ下の数字を出せる。例：♠4に♠3。その後は元の数字より大きいカード（♠5以上）を出せる。場が空なら発動しない</td></tr>
 <tr><td>縛り</td><td>場にカードがある状態で、同じマークで続けて出した場合に発生</td></tr>
-<tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる。ジョーカーで連番の欠けを1つ補える</td></tr>
-<tr><td>ジョーカー</td><td>場のカードが1枚なら条件を問わず出せる。ペア・革命・階段の不足分にも使える</td></tr>
+<tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる。ジョーカー1～2枚で連番の欠けを補える</td></tr>
+<tr><td>ジョーカー</td><td>場のカードが1枚なら条件を問わず出せる。ペア・革命・階段の不足分にも1～2枚使える</td></tr>
 <tr><td>禁止上がり</td><td>2・ジョーカーなど禁止カードで上がると反則</td></tr>
 <tr><td>都落ち</td><td>この版では未実装</td></tr>
 </tbody>
@@ -434,20 +434,23 @@ function validSet(cards){
  const normal=cards.filter(c=>c.rank!==16);
  if(cards.length===1)return true;
 
- // 同じ数字の組み合わせはジョーカーを不足分の数字として扱う（最大4枚）。
+ // 同じ数字の組み合わせはジョーカーで不足分を補える（最大4枚）。
+ // 例：6・6・ジョーカー・ジョーカーも4枚組として革命可能。
  if(normal.length&&normal.every(c=>c.rank===normal[0].rank)){
-  return cards.length<=4 && jokers.length<=1;
+  return cards.length<=4 && jokers.length<=2;
  }
- // ジョーカー2枚だけのペアも有効。
- if(!normal.length)return cards.length===2;
+ // ジョーカーだけの組み合わせは1枚出し、または2枚ペアを有効にする。
+ if(!normal.length)return cards.length<=2;
 
- // 階段：通常カードは同じマークで、ジョーカーは連続する数字の欠けを1つだけ埋める。
- if(jokers.length!==1 || normal.length<2)return false;
+ // 階段：同じマークの数字が2枚以上あれば、ジョーカー1～2枚で連続する範囲を補える。
+ // 通常カードが同じマークで重複せず、全カードを含む連続区間が作れれば有効。
+ if(jokers.length<1 || jokers.length>2 || normal.length<2)return false;
  if(!normal.every(c=>c.suit===normal[0].suit))return false;
  const ranks=normal.map(c=>c.rank).sort((a,b)=>a-b);
  if(new Set(ranks).size!==ranks.length)return false;
- const span=ranks[ranks.length-1]-ranks[0]+1;
- return span===cards.length && span<=13;
+ const minRank=Math.min(...ranks), maxRank=Math.max(...ranks);
+ const span=maxRank-minRank+1;
+ return span<=cards.length && cards.length<=13 && maxRank-minRank<cards.length;
 }
 
 function canBeat(cards){
@@ -726,9 +729,10 @@ function playCards(cards,byCpu=false){
 
   // 同じ数字3枚＋ジョーカーも4枚組として革命。階段のジョーカーは欠けた数字を埋める。
   const normalCards=cards.filter(c=>c.rank!==16);
-  const hasOneJoker=cards.filter(c=>c.rank===16).length===1;
-  const sameRankRevolution=cards.length>=4&&normalCards.length>0&&normalCards.every(c=>c.rank===normalCards[0].rank)&&cards.length<=4;
-  const stairRevolution=cards.length>=4&&hasOneJoker&&normalCards.length===cards.length-1&&normalCards.every(c=>c.suit===normalCards[0].suit)&&new Set(normalCards.map(c=>c.rank)).size===normalCards.length&&(Math.max(...normalCards.map(c=>c.rank))-Math.min(...normalCards.map(c=>c.rank))+1===cards.length);
+  const jokerCount=cards.filter(c=>c.rank===16).length;
+  const sameRankRevolution=cards.length===4&&normalCards.length>0&&normalCards.every(c=>c.rank===normalCards[0].rank)&&jokerCount<=2;
+  // 4枚以上の階段も、ジョーカー1～2枚で欠けを埋めていれば革命。
+  const stairRevolution=cards.length>=4&&jokerCount>=1&&jokerCount<=2&&normalCards.length>=2&&normalCards.every(c=>c.suit===normalCards[0].suit)&&new Set(normalCards.map(c=>c.rank)).size===normalCards.length&&(Math.max(...normalCards.map(c=>c.rank))-Math.min(...normalCards.map(c=>c.rank))<cards.length);
   if(sameRankRevolution||stairRevolution){
    state.revolution=!state.revolution;
    state.effects.push(state.revolution?'革命':'革命返し');
@@ -1226,14 +1230,25 @@ function cpuTurn(){
     }
    }
   }
-  // CPUは同ランクの3枚＋ジョーカー革命も候補にする。
-  const cpuJoker=p.hand.find(c=>c.rank===16);
+  // CPUはジョーカー2枚を使うペア・革命・階段も候補にする。
+  const cpuJokers=p.hand.filter(c=>c.rank===16);
+  const cpuJoker=cpuJokers[0];
   if(cpuJoker){
    for(const rank of RANKS){
     const same=p.hand.filter(c=>c.rank===rank);
     if(same.length>=1&&canBeat([same[0],cpuJoker]))options.push([same[0],cpuJoker]);
     if(same.length>=2&&canBeat([same[0],same[1],cpuJoker]))options.push([same[0],same[1],cpuJoker]);
     if(same.length>=3&&canBeat([same[0],same[1],same[2],cpuJoker]))options.push([same[0],same[1],same[2],cpuJoker]);
+    if(cpuJokers.length>=2&&same.length>=2&&canBeat([same[0],same[1],cpuJokers[0],cpuJokers[1]]))options.push([same[0],same[1],cpuJokers[0],cpuJokers[1]]);
+   }
+   if(cpuJokers.length>=2){
+    for(const suit of SUITS){
+     const suited=p.hand.filter(c=>c.suit===suit&&c.rank!==16).sort((a,b)=>a.rank-b.rank);
+     for(let i=0;i<suited.length;i++)for(let j=i+1;j<suited.length;j++){
+      const pair=[suited[i],suited[j],cpuJokers[0],cpuJokers[1]];
+      if(canBeat(pair))options.push(pair);
+     }
+    }
    }
   }
 
