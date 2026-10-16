@@ -59,7 +59,6 @@ function validSet(cards){
  if(!normal.length)return cards.length<=2;
  return stairRanks(cards)!==null;
 }
-function isJBackDownStep(previous,next,g){const order=[11,12,13,14,15];return !!(g.jBack&&previous&&next&&previous.rank!==16&&next.rank!==16&&previous.suit===next.suit&&order.indexOf(next.rank)===order.indexOf(previous.rank)+1&&order.includes(previous.rank));}
 function canBeat(cards,g){
  if(!validSet(cards))return false;
  if(g.firstMove)return cards.length===1&&cards[0].rank===3&&cards[0].suit==='♦';
@@ -72,7 +71,7 @@ function canBeat(cards,g){
  const playedStair=stairRanks(cards),tableStair=stairRanks(g.table);
  if(playedStair&&tableStair)return power(playedStair[playedStair.length-1],g)>power(tableStair[tableStair.length-1],g);
  if(g.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==g.lockSuit))return false;
- // ダウンナンバー中は、場のカードと同じスートで前後1つの数字だけ出せる。
+ // ダウンナンバー中はJバックの状態に関係なく、同じスートの前後1つの数字を出せる。
  if(cards.length===1&&g.table.length===1&&cards[0].rank!==16&&g.table[0].rank!==16){
   const adjacent=cards[0].suit===g.table[0].suit&&Math.abs(cards[0].rank-g.table[0].rank)===1;
   if(g.downBase!==null)return adjacent;
@@ -160,6 +159,7 @@ function doPlay(code,playerId,ids){
   if(count(8)>0){g.effects.push(`8切り（${count(8)}枚）`);g.eightPending=true;addLog(g,'8切り：4止めの機会です。');}
   if(count(9)>0){g.effects.push('9能力無効化');g.neutralizeCount=Math.max(g.neutralizeCount,count(9));addLog(g,`9の効果：次の${g.neutralizeCount}回の特殊効果を無効化。`);}
   const discard=count(10);if(discard){g.effects.push(`10捨て（${discard}枚）`);const remaining=Math.min(discard,p.hand.length);if(remaining>0)g.pendingActions.push({type:'discard',actor:g.turn,remaining});}
+  // ダウンナンバーでJを出した場合も、通常どおりJバックを発動する。
   const js=count(11);if(js)g.effects.push(`Jバック（${js}回）`);for(let k=0;k<js;k++)g.jBack=!g.jBack;if(js){if(js%2===1)g.jBackSerial=(g.jBackSerial||0)+1;addLog(g,`Jバック${js%2?'発動':'解除'}。`);}
   const normal=cards.filter(c=>c.rank!==16),jokerCount=cards.filter(c=>c.rank===16).length;
   const sameRankRevolution=cards.length===4&&normal.length>0&&normal.every(c=>c.rank===normal[0].rank)&&jokerCount<=2;
