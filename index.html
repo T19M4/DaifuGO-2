@@ -106,6 +106,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .online-actions{display:flex;gap:8px;flex-wrap:wrap}.online-actions button{flex:1;min-width:130px}
 #onlinePlayers{padding-left:20px;line-height:1.8}.online-code{font-size:24px;letter-spacing:3px;color:#ffdf71;font-weight:900}
 
+
+.online-game-modal{position:fixed;inset:0;z-index:4000;background:#001a16f2;display:none;overflow:auto;padding:12px;align-items:flex-start;justify-content:center}
+.online-game-modal.open{display:flex}.online-game-box{width:min(1100px,100%);background:#07382e;border:2px solid #ffd85a;border-radius:16px;padding:16px;box-shadow:0 12px 40px #0009;margin:auto}
+.online-game-players{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.online-game-player{background:#0a4938;border:1px solid #4e9b82;border-radius:10px;padding:9px;text-align:center;min-width:0}.online-game-player.active{outline:3px solid #ffd85a;background:#15553f}.online-game-player small{display:block;color:#bce8e7;margin-top:4px}
+.online-game-table{min-height:115px;border:1px dashed #73b5a0;border-radius:12px;display:flex;justify-content:center;align-items:center;gap:5px;flex-wrap:wrap;padding:10px;margin:10px 0}.online-game-hand{display:flex;align-items:flex-end;justify-content:center;flex-wrap:wrap;gap:5px;min-height:95px;padding:10px;border:1px solid #478f81;border-radius:12px;background:#07382e}.online-card{width:52px;height:75px;border-radius:7px;background:#fff;color:#111;border:1px solid #ddd;display:flex;flex-direction:column;justify-content:space-between;padding:4px;font-weight:900;cursor:pointer}.online-card.red{color:#d51f2a}.online-card.selected{transform:translateY(-10px);outline:3px solid #ffd85a}.online-card .big{font-size:22px;align-self:center}.online-game-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0}.online-game-log{max-height:125px;overflow:auto;background:#042920;border-radius:8px;padding:8px;font-size:13px;line-height:1.6}.online-q-options{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}.online-q-options button{min-width:48px}.online-game-status{font-weight:800;color:#ffe88a;text-align:center;min-height:25px}.online-game-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:550px){.online-game-players{grid-template-columns:repeat(2,minmax(0,1fr))}.online-card{width:42px;height:64px}.online-game-box{padding:10px}}
+
 </style>
 </head>
 <body>
@@ -253,11 +260,26 @@ button:disabled{opacity:.45;cursor:not-allowed}
    <p>ルームコード：<span class="online-code" id="onlineRoomCodeView"></span></p>
    <p>参加者（最大4人）</p><ol id="onlinePlayers"></ol>
    <p class="subtle" id="onlineLobbyStatus">参加者を待っています。</p>
+   <button id="startOnlineGameBtn" style="display:none;width:100%;margin-top:10px">ゲーム開始（CPUで4人に補充）</button>
   </div>
   <p id="onlineError" role="status" style="color:#ffb6a9;min-height:24px"></p>
   <div class="online-actions"><button id="closeOnlineModal" style="background:#244753">閉じる</button></div>
  </div>
 </div>
+
+<div class="online-game-modal" id="onlineGameModal" role="dialog" aria-modal="true" aria-labelledby="onlineGameTitle">
+ <div class="online-game-box">
+  <div class="online-game-top"><h2 id="onlineGameTitle" style="margin:0">オンライン対戦</h2><span id="onlineGameRoom" class="online-code"></span></div>
+  <div class="online-game-status" id="onlineGameStatus">ゲーム準備中</div>
+  <div class="online-game-players" id="onlineGamePlayers"></div>
+  <h3 style="margin:8px 0">場のカード</h3><div class="online-game-table" id="onlineGameTable">まだカードはありません</div>
+  <div id="onlineQArea" style="display:none"><strong>Qボンバー：破壊する数字を選択</strong><div class="online-q-options" id="onlineQOptions"></div></div>
+  <h3 style="margin:8px 0">あなたの手札 <span class="subtle" id="onlineHandCount"></span></h3><div class="online-game-hand" id="onlineGameHand"></div>
+  <div class="online-game-actions"><button id="onlinePlayBtn">選択したカードを出す</button><button id="onlinePassBtn">パス</button><button id="onlineClearBtn" style="background:#44535a">選択解除</button><button id="onlineExitGameBtn" style="background:#244753">閉じる</button></div>
+  <div class="online-game-log" id="onlineGameLog"></div>
+ </div>
+</div>
+
 <script src="https://daifugo-2.onrender.com/socket.io/socket.io.js"></script>
 <script>
 const SUITS=['♠','♥','♦','♣'];
@@ -1438,68 +1460,61 @@ document.addEventListener('keydown',e=>{
 });
 
 
-// オンラインルーム接続（この段階ではルーム作成・参加・参加者一覧を実装）
+// オンラインルームと対戦UI
 const ONLINE_SERVER_URL = 'https://daifugo-2.onrender.com';
 let onlineSocket = null;
 let onlineRoomCode = null;
 let onlineIsHost = false;
+let onlineGameData = null;
+let onlineSelected = new Set();
 function openOnlineModal(){
- const modal=document.getElementById('onlineModal');
- modal.classList.add('open');
- document.getElementById('onlineError').textContent='';
+ const modal=document.getElementById('onlineModal');modal.classList.add('open');document.getElementById('onlineError').textContent='';
  if(!onlineSocket){
-  if(typeof io!=='function'){
-   document.getElementById('onlineError').textContent='通信ライブラリを読み込めません。ページを再読み込みしてください。';
-   return;
-  }
+  if(typeof io!=='function'){document.getElementById('onlineError').textContent='通信ライブラリを読み込めません。Renderのサーバーを確認してください。';return;}
   onlineSocket=io(ONLINE_SERVER_URL,{transports:['websocket','polling']});
   onlineSocket.on('connect_error',()=>{document.getElementById('onlineError').textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
   onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
-  onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。'; resetOnlineLobby();});
+  onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);});
+  onlineSocket.on('onlineActionError',msg=>{document.getElementById('onlineGameStatus').textContent=msg;});
+  onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。';resetOnlineLobby();});
  }
 }
 function renderOnlinePlayers(players){
- const list=document.getElementById('onlinePlayers'); list.innerHTML='';
+ const list=document.getElementById('onlinePlayers');list.innerHTML='';
  (players||[]).forEach(p=>{const li=document.createElement('li');li.textContent=p.name+(p.isCPU?'（CPU）':'');list.appendChild(li);});
- document.getElementById('onlineLobbyStatus').textContent=(players||[]).length+'/4 人が参加中。CPU補充を含む対戦開始処理は次の統合段階で接続します。';
+ document.getElementById('onlineLobbyStatus').textContent=(players||[]).length+'/4 人が参加中。ゲーム開始すると不足人数はCPUになります。';
 }
-function resetOnlineLobby(){
- onlineRoomCode=null; onlineIsHost=false;
- document.getElementById('onlineLobby').style.display='none';
-}
+function resetOnlineLobby(){onlineRoomCode=null;onlineIsHost=false;document.getElementById('onlineLobby').style.display='none';document.getElementById('startOnlineGameBtn').style.display='none';}
 function onlineRequest(eventName,payload){
- const error=document.getElementById('onlineError'); error.textContent='';
- if(!onlineSocket){openOnlineModal();}
- if(!onlineSocket)return;
+ const error=document.getElementById('onlineError');error.textContent='';if(!onlineSocket){openOnlineModal();}if(!onlineSocket)return;
  if(!onlineSocket.connected){error.textContent='サーバーへ接続中です。少し待ってからもう一度試してください。';return;}
- onlineSocket.emit(eventName,payload,result=>{
-  if(!result||!result.ok){error.textContent=result?.message||'処理に失敗しました。';return;}
-  onlineRoomCode=result.roomCode; onlineIsHost=!!result.isHost;
-  document.getElementById('onlineRoomCodeView').textContent=result.roomCode;
-  document.getElementById('onlineLobby').style.display='block';
-  renderOnlinePlayers(result.players||[]);
+ onlineSocket.emit(eventName,payload,result=>{if(!result||!result.ok){error.textContent=result?.message||'処理に失敗しました。';return;}
+  onlineRoomCode=result.roomCode;onlineIsHost=!!result.isHost;document.getElementById('onlineRoomCodeView').textContent=result.roomCode;document.getElementById('onlineLobby').style.display='block';document.getElementById('startOnlineGameBtn').style.display=onlineIsHost?'block':'none';renderOnlinePlayers(result.players||[]);
  });
 }
-document.getElementById('createOnlineRoom').addEventListener('click',()=>{
- const name=document.getElementById('onlineName').value.trim().slice(0,6);
- if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}
- onlineRequest('createRoom',{name});
-});
-document.getElementById('joinOnlineRoom').addEventListener('click',()=>{
- const name=document.getElementById('onlineName').value.trim().slice(0,6);
- const roomCode=document.getElementById('onlineRoomCode').value.trim().toUpperCase();
- if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}
- if(!roomCode){document.getElementById('onlineError').textContent='参加コードを入力してください。';return;}
- onlineRequest('joinRoom',{name,roomCode});
-});
-document.getElementById('closeOnlineModal').addEventListener('click',()=>{
- document.getElementById('onlineModal').classList.remove('open');
- if(selectedMode==='online'){
-  selectedMode='offline';
-  document.querySelector('h1 span').textContent='～オフラインモード～';
- }
-});
+document.getElementById('createOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6);if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}onlineRequest('createRoom',{name});});
+document.getElementById('joinOnlineRoom').addEventListener('click',()=>{const name=document.getElementById('onlineName').value.trim().slice(0,6),roomCode=document.getElementById('onlineRoomCode').value.trim().toUpperCase();if(!name){document.getElementById('onlineError').textContent='名前を入力してください（最大6文字）。';return;}if(!roomCode){document.getElementById('onlineError').textContent='参加コードを入力してください。';return;}onlineRequest('joinRoom',{name,roomCode});});
+document.getElementById('startOnlineGameBtn').addEventListener('click',()=>{if(!onlineSocket||!onlineSocket.connected){document.getElementById('onlineError').textContent='サーバーに接続されていません。';return;}onlineSocket.emit('startOnlineGame',{},result=>{if(!result?.ok)document.getElementById('onlineError').textContent=result?.message||'ゲームを開始できません。';else document.getElementById('onlineModal').classList.remove('open');});});
+document.getElementById('closeOnlineModal').addEventListener('click',()=>document.getElementById('onlineModal').classList.remove('open'));
 document.getElementById('onlineModal').addEventListener('click',e=>{if(e.target.id==='onlineModal')document.getElementById('onlineModal').classList.remove('open');});
+function onlineCardLabel(c){return c.rank===16?'JOKER':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[c.rank]||String(c.rank))+c.suit;}
+function makeOnlineCard(c,selected,click){const b=document.createElement('button');b.type='button';b.className='online-card'+(('♥♦'.includes(c.suit))?' red':'')+(selected?' selected':'');const corner=document.createElement('span');corner.textContent=c.rank===16?'★':onlineCardLabel(c);const big=document.createElement('span');big.className='big';big.textContent=c.rank===16?'★':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[c.rank]||String(c.rank));const bottom=document.createElement('span');bottom.textContent=c.suit;b.append(corner,big,bottom);if(click)b.addEventListener('click',click);return b;}
+function renderOnlineGame(g){
+ const modal=document.getElementById('onlineGameModal');modal.classList.add('open');document.getElementById('onlineGameRoom').textContent=onlineRoomCode||'';
+ const current=g.players[g.turn];let status=g.finished?'ゲーム終了：'+(g.finishOrder||[]).join(' → '):g.pendingQ?(g.pendingQ.mine?'Qボンバーの数字を選択してください':'Qボンバー処理中'):((g.myTurn?'あなたのターン':`${current?.name||'相手'}のターン`)+(g.firstMove?'（♦3を出して開始）':''));
+ document.getElementById('onlineGameStatus').textContent=g.notice||status;
+ const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・上がり`: `手札 ${p.handCount}枚`;d.append(b,sm);ps.append(d);});
+ const table=document.getElementById('onlineGameTable');table.innerHTML='';if(g.table?.length)g.table.forEach(c=>table.append(makeOnlineCard(c,false,null)));else table.textContent='場にカードはありません';
+ const hand=document.getElementById('onlineGameHand');hand.innerHTML='';const myHand=g.myHand||[];document.getElementById('onlineHandCount').textContent=`${myHand.length}枚`;
+ myHand.forEach(c=>hand.append(makeOnlineCard(c,onlineSelected.has(c.id),()=>{if(!g.myTurn||g.pendingQ||g.finished)return;if(onlineSelected.has(c.id))onlineSelected.delete(c.id);else onlineSelected.add(c.id);renderOnlineGame(g);} )));
+ const canAct=!!g.myTurn&&!g.finished&&!g.pendingQ;document.getElementById('onlinePlayBtn').disabled=!canAct||onlineSelected.size===0;document.getElementById('onlinePassBtn').disabled=!canAct||g.firstMove;document.getElementById('onlineClearBtn').disabled=!onlineSelected.size;
+ const qa=document.getElementById('onlineQArea'),qo=document.getElementById('onlineQOptions');qo.innerHTML='';qa.style.display=g.pendingQ?.mine?'block':'none';if(g.pendingQ?.mine){[3,4,5,6,7,8,9,10,11,12,13,14,15,16].forEach(rank=>{const b=document.createElement('button');b.textContent=rank===16?'JOKER':({11:'J',12:'Q',13:'K',14:'A',15:'2'}[rank]||String(rank));b.addEventListener('click',()=>onlineSocket.emit('onlineQSelect',{rank},result=>{if(result&&!result.ok)document.getElementById('onlineGameStatus').textContent=result.message||'選択できません';}));qo.append(b);});}
+ const logs=document.getElementById('onlineGameLog');logs.innerHTML='';(g.logs||[]).slice().reverse().forEach(line=>{const div=document.createElement('div');div.textContent=line;logs.append(div);});
+}
+document.getElementById('onlinePlayBtn').addEventListener('click',()=>{if(!onlineSocket||!onlineSelected.size)return;onlineSocket.emit('onlinePlay',{cardIds:[...onlineSelected]},()=>{});onlineSelected.clear();});
+document.getElementById('onlinePassBtn').addEventListener('click',()=>{onlineSelected.clear();onlineSocket?.emit('onlinePass',{},()=>{});});
+document.getElementById('onlineClearBtn').addEventListener('click',()=>{onlineSelected.clear();if(onlineGameData)renderOnlineGame(onlineGameData);});
+document.getElementById('onlineExitGameBtn').addEventListener('click',()=>document.getElementById('onlineGameModal').classList.remove('open'));
 
 newGame();
 </script>
