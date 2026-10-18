@@ -385,7 +385,8 @@ function stairRanks(cards){
 function forbiddenOnlineName(value){
  const raw=String(value||'').normalize('NFKC').toLowerCase();
  const compact=raw.replace(/[\s\u3000]+/g,'');
- return ['松村拓真','小林裕也','matsumura takuma','kobayashi yuya','matsumura','takuma','kobayashi','yuya'].some(term=>raw.includes(term)||compact.includes(term.replace(/\s+/g,'')));
+ const latinCompact=compact.replace(/[^a-z0-9]/g,'');
+ return ['松村','拓真','小林','裕也','matsumura','takuma','kobayashi','yuya'].some(term=>compact.includes(term)||latinCompact.includes(term));
 }
 
 // ダウンナンバーはJバック中も通常の数字順で、同じスートの前後1つを出せる。
@@ -778,7 +779,8 @@ function playCards(cards,byCpu=false){
  // 場が空でなければ、前の場とのマーク一致を縛り判定に使う
  const oldLockSuit=state.lockSuit;
  const wasTableOccupied=state.table.length>0;
- const downNumberPlay=state.table.length===1 && cards.length===1 &&
+ const qToJBack=state.table.length===1 && cards.length===1 && state.table[0].rank===12 && cards[0].rank===11 && cards[0].suit===state.table[0].suit;
+ const downNumberPlay=!qToJBack && state.table.length===1 && cards.length===1 &&
   cards[0].rank!==16 && state.table[0].rank!==16 &&
   cards[0].suit===state.table[0].suit &&
   Math.abs(cards[0].rank-state.table[0].rank)===1;
@@ -813,7 +815,8 @@ function playCards(cards,byCpu=false){
 
  let msg=p.name+'：'+cards.map(cardText).join(' ');
  log(msg);
- if(downNumberPlay)log('ダウンナンバー！ '+cardText(oldTable[0])+'に対して'+cardText(cards[0])+'を出しました。続けて同じスートの前後1つの数字を出せます。');
+ if(qToJBack)log('QのあとにJ：ダウンナンバーを解除し、Jバックを発動します。');
+ else if(downNumberPlay)log('ダウンナンバー！ '+cardText(oldTable[0])+'に対して'+cardText(cards[0])+'を出しました。続けて同じスートの前後1つの数字を出せます。');
 
  let clearNow=false;
  let skip=0;
@@ -873,11 +876,13 @@ function playCards(cards,byCpu=false){
    state.pendingDiscardCount=n;
   }
 
-  if(effectCount(11)>0){
-   for(let i=0;i<effectCount(11);i++)state.jBack=!state.jBack;
-   state.effects.push('Jバック（'+effectCount(11)+'回）');
-   log('Jバック：カードの強さが一時的に逆転（'+effectCount(11)+'回分）');
-   if(effectCount(11)%2===1)showJJBubble();
+  const jBackCount=effectCount(11);
+  const triggerJBack=jBackCount>0&&!oldTable.some(c=>c.rank===9);
+  if(triggerJBack){
+   state.jBack=!state.jBack;
+   state.effects.push('Jバック（Jを'+jBackCount+'枚出し・効果1回）');
+   log('Jバック：カードの強さが一時的に逆転（Jを'+jBackCount+'枚出し）');
+   showJJBubble();
   }
 
   // 同じ数字3枚＋ジョーカーも4枚組として革命。階段のジョーカーは欠けた数字を埋める。
@@ -985,8 +990,9 @@ function continueAfterPlay(p,byCpu,clearNow,skip){
   return true;
  }
 
- if(skip)advance(2);
- else advance(1);
+ const activeCount=state.players.filter(player=>!player.finished&&player.hand.length>0).length;
+ const boundedSkip=Math.min(Math.max(0,skip||0),Math.max(0,activeCount-1));
+ advance(1+boundedSkip);
 
  render();
  document.getElementById('notice').textContent=byCpu?p.name+'がカードを出しました':'カードを出しました';
@@ -1600,7 +1606,7 @@ function renderAccountStatus(message=''){
  if(onlineAccount){status.textContent='ログイン中：'+onlineAccount.username;rank.textContent=`RP：${onlineAccount.rp||0} ／ 対戦 ${onlineAccount.games||0}回 ／ 優勝 ${onlineAccount.wins||0}回`;document.getElementById('logoutAccountBtn').style.display='inline-block';}
  else{status.textContent=message||'未ログイン';rank.textContent='';document.getElementById('logoutAccountBtn').style.display='none';}
 }
-function authRequest(eventName){if(!onlineSocket){openOnlineModal();}if(!onlineSocket||!onlineSocket.connected){document.getElementById('accountStatus').textContent='サーバーに接続してから操作してください。';return;}const username=document.getElementById('accountUsername').value.trim(),password=document.getElementById('accountPassword').value;onlineSocket.emit(eventName,{username,password},result=>{if(!result?.ok){document.getElementById('accountStatus').textContent=result?.message||'認証に失敗しました。';return;}onlineAuthToken=result.token;onlineAccount=result.account;localStorage.setItem('daifugo2_auth_token',onlineAuthToken);document.getElementById('accountPassword').value='';renderAccountStatus();});}
+function authRequest(eventName){if(eventName==='authRegister'){const username=document.getElementById('accountUsername').value.trim();if(forbiddenOnlineName(username)){document.getElementById('accountStatus').textContent='このユーザー名は使用できません。禁止ワードが含まれています。';return;}}if(!onlineSocket){openOnlineModal();}if(!onlineSocket||!onlineSocket.connected){document.getElementById('accountStatus').textContent='サーバーに接続してから操作してください。';return;}const username=document.getElementById('accountUsername').value.trim(),password=document.getElementById('accountPassword').value;onlineSocket.emit(eventName,{username,password},result=>{if(!result?.ok){document.getElementById('accountStatus').textContent=result?.message||'認証に失敗しました。';return;}onlineAuthToken=result.token;onlineAccount=result.account;localStorage.setItem('daifugo2_auth_token',onlineAuthToken);document.getElementById('accountPassword').value='';renderAccountStatus();});}
 document.getElementById('registerAccountBtn').addEventListener('click',()=>authRequest('authRegister'));
 document.getElementById('loginAccountBtn').addEventListener('click',()=>authRequest('authLogin'));
 document.getElementById('logoutAccountBtn').addEventListener('click',()=>{if(!onlineSocket)return;onlineSocket.emit('authLogout',{},()=>{onlineAuthToken='';onlineAccount=null;localStorage.removeItem('daifugo2_auth_token');renderAccountStatus('ログアウトしました。');});});
