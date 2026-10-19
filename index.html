@@ -111,7 +111,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .jj-bubble{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;pointer-events:none;z-index:5004;color:#fff;font-size:clamp(25px,5vw,58px);font-weight:1000;text-align:center;white-space:nowrap;text-shadow:0 4px 0 #8b1c1c,0 0 18px #ffec62,3px 6px 12px #000;background:linear-gradient(135deg,#ff3b3b,#ff8a00,#ffdf3d);border:4px solid #fff6a6;border-radius:24px;padding:18px 24px;box-shadow:0 0 0 6px #ff3b3b88,0 0 38px #ffdf3d}
 .jj-bubble.show{animation:jj-shout 1.6s cubic-bezier(.2,.8,.2,1) both}
 @keyframes jj-shout{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(-12deg)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.2) rotate(5deg)}24%{transform:translate(-50%,-50%) scale(.95) rotate(-3deg)}36%{transform:translate(-50%,-50%) scale(1.05) rotate(2deg)}72%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(8deg)}}
-.revolution-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:5003;pointer-events:none;overflow:hidden;background:radial-gradient(circle at center,#fff6a8f5 0%,#ffb000ed 22%,#f33a00e8 48%,#250044ed 78%);}
+.revolution-blackout{position:fixed;inset:0;background:#000;opacity:0;display:none;z-index:5002;pointer-events:none}.revolution-blackout.show{display:block;animation:revolution-blackout-in .55s ease both}.revolution-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:5003;pointer-events:none;overflow:hidden;background:radial-gradient(circle at center,#fff6a8f5 0%,#ffb000ed 22%,#f33a00e8 48%,#250044ed 78%);}
 .revolution-overlay.show{display:flex;animation:revolution-screen 3.8s ease both}
 .revolution-lights{position:absolute;inset:7%;border:8px dotted #fff5a6;border-radius:30px;box-shadow:inset 0 0 35px #fff,0 0 35px #ffd700;animation:revolution-lights 0.18s steps(2,end) infinite;}
 .revolution-jackpot{position:absolute;top:9%;left:50%;transform:translateX(-50%) rotate(-3deg);padding:8px 22px;border:4px solid #fff6a6;border-radius:14px;background:linear-gradient(#fff3a0,#ff9c00 50%,#e52200);color:#fff;text-shadow:0 3px 0 #9e1700,0 0 12px #fff;font-size:clamp(20px,5vw,46px);font-weight:1000;letter-spacing:.12em;box-shadow:0 0 28px #ffef77;animation:jackpot-pulse .35s ease-in-out infinite alternate;}
@@ -123,6 +123,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @keyframes revolution-lights{0%{filter:brightness(1);border-color:#fff4a6}100%{filter:brightness(1.8);border-color:#ff3b00}}
 @keyframes jackpot-pulse{from{filter:brightness(1);transform:translateX(-50%) scale(1) rotate(-3deg)}to{filter:brightness(1.7);transform:translateX(-50%) scale(1.08) rotate(3deg)}}
 @keyframes ball-rain{0%{transform:translateY(-5vh) translateX(0) rotate(0);opacity:0}8%{opacity:1}100%{transform:translateY(115vh) translateX(var(--drift)) rotate(900deg);opacity:.15}}
+@keyframes revolution-blackout-in{0%{opacity:0}100%{opacity:1}}
 @keyframes revolution-screen{0%{opacity:0}8%{opacity:1}82%{opacity:1}100%{opacity:0}}
 @keyframes revolution-title{0%{transform:scale(.2) rotate(-10deg)}15%{transform:scale(1.2) rotate(4deg)}25%{transform:scale(.95) rotate(-2deg)}40%{transform:scale(1.05) rotate(1deg)}75%{transform:scale(1) rotate(0)}100%{transform:scale(.8) rotate(5deg)}}
 @keyframes revolution-spin{from{transform:rotate(0deg) scale(.7)}to{transform:rotate(540deg) scale(1.2)}}
@@ -138,7 +139,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 .online-game-modal{position:fixed;inset:0;z-index:4000;background:#001a16f2;display:none;overflow:auto;padding:12px;align-items:flex-start;justify-content:center}
 .online-game-modal.open{display:flex}.online-game-box{width:min(1100px,100%);background:#07382e;border:2px solid #ffd85a;border-radius:16px;padding:16px;box-shadow:0 12px 40px #0009;margin:auto}
-.online-game-players{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.online-game-player{background:#0a4938;border:1px solid #4e9b82;border-radius:10px;padding:9px;text-align:center;min-width:0}.online-game-player.active{outline:3px solid #ffd85a;background:#15553f}.online-game-player small{display:block;color:#bce8e7;margin-top:4px}
+.online-game-players{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.online-game-player{background:#0a4938;border:1px solid #4e9b82;border-radius:10px;padding:9px;text-align:center;min-width:0}.online-game-player.active{outline:3px solid #ffd85a;background:#15553f}.online-game-player small{display:block;color:#bce8e7;margin-top:4px}.joker-disclosure{display:block;color:#ffcf65;font-weight:1000;font-size:12px;margin-top:4px;text-shadow:0 0 8px #ff9c00}
 .online-game-table{min-height:115px;border:1px dashed #73b5a0;border-radius:12px;display:flex;justify-content:center;align-items:center;gap:5px;flex-wrap:wrap;padding:10px;margin:10px 0}.online-game-hand{display:flex;align-items:flex-end;justify-content:center;flex-wrap:wrap;gap:5px;min-height:95px;padding:10px;border:1px solid #478f81;border-radius:12px;background:#07382e}.online-card{width:52px;height:75px;border-radius:7px;background:#fff;color:#111;border:1px solid #ddd;display:flex;flex-direction:column;justify-content:space-between;padding:4px;font-weight:900;cursor:pointer}.online-card.red{color:#d51f2a}.online-card.selected{transform:translateY(-10px);outline:3px solid #ffd85a}.online-card .big{font-size:22px;align-self:center}.online-game-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0}.online-game-log{max-height:125px;overflow:auto;background:#042920;border-radius:8px;padding:8px;font-size:13px;line-height:1.6}.online-q-options{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}.online-q-options button{min-width:48px}.online-game-status{font-weight:800;color:#ffe88a;text-align:center;min-height:25px}.online-effect-list{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0 12px}.online-effect-chip{border:1px solid #70d7a0;background:#147a4b;color:#fff;border-radius:18px;padding:5px 10px;font-weight:800;font-size:13px}.online-effect-toast{position:fixed;z-index:5005;left:50%;top:15%;transform:translate(-50%,-20px) scale(.7);opacity:0;pointer-events:none;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:20px;padding:14px 22px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}.online-effect-toast.show{animation:online-toast-pop 1.8s ease both}@keyframes online-toast-pop{0%{opacity:0;transform:translate(-50%,-20px) scale(.65)}12%{opacity:1;transform:translate(-50%,0) scale(1.08)}25%{transform:translate(-50%,0) scale(1)}78%{opacity:1}100%{opacity:0;transform:translate(-50%,-18px) scale(.9)}}.online-game-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
 @media (pointer: coarse) and (max-width: 600px) {.online-game-players{grid-template-columns:repeat(2,minmax(0,1fr))}.online-card{width:42px;height:64px}.online-game-box{padding:10px}}
 
@@ -375,6 +376,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 <div id="fourStopBubble" class="fourstop-bubble" aria-live="polite">止め価値あり！</div>
 <div id="jjBubble" class="jj-bubble" aria-live="polite">おJJスターバックスバックス！？</div>
+<div id="revolutionBlackout" class="revolution-blackout" aria-hidden="true"></div><audio id="revolutionAudio" preload="auto"><source src="free_sound1055.mp3" type="audio/mpeg"></audio>
 <div id="revolutionOverlay" class="revolution-overlay" aria-hidden="true"><div class="revolution-rays"></div><div class="revolution-lights"></div><div class="revolution-balls" id="revolutionBalls"></div><div class="revolution-jackpot">SUPER JACKPOT</div><div class="revolution-title" id="revolutionTitle">革命！！</div></div>
 <div id="onlineEffectToast" class="online-effect-toast" aria-live="polite"></div>
 
@@ -556,41 +558,30 @@ function showJJBubble(){
 }
 
 let revolutionAudioContext=null;
-function initRevolutionAudio(){
- try{
-  const AudioCtx=window.AudioContext||window.webkitAudioContext;
-  if(!AudioCtx)return null;
-  if(!revolutionAudioContext)revolutionAudioContext=new AudioCtx();
-  if(revolutionAudioContext.state==='suspended')revolutionAudioContext.resume();
-  return revolutionAudioContext;
- }catch(e){return null;}
-}
-// パチンコの大当たりをイメージした、外部音源を使わないオリジナル電子音。
 function playRevolutionSound(){
- const ctx=initRevolutionAudio();if(!ctx)return;
- const now=ctx.currentTime;
- const master=ctx.createGain();master.gain.setValueAtTime(0.0001,now);master.gain.exponentialRampToValueAtTime(0.24,now+0.04);master.gain.exponentialRampToValueAtTime(0.0001,now+3.1);master.connect(ctx.destination);
- // きらびやかな上昇ファンファーレ
- [523.25,659.25,783.99,1046.5,1318.5,1567.98].forEach((freq,i)=>{
-  const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type=i%2?'triangle':'sawtooth';osc.frequency.setValueAtTime(freq*0.72,now+i*0.095);osc.frequency.exponentialRampToValueAtTime(freq,now+i*0.095+0.14);gain.gain.setValueAtTime(0.0001,now+i*0.095);gain.gain.exponentialRampToValueAtTime(0.2/(i+1),now+i*0.095+0.025);gain.gain.exponentialRampToValueAtTime(0.0001,now+i*0.095+0.42);osc.connect(gain);gain.connect(master);osc.start(now+i*0.095);osc.stop(now+i*0.095+0.45);
- });
- // 大当たりベルのような余韻
- [1046.5,1318.5,1568,2093].forEach((freq,i)=>{const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(0.0001,now+0.65);gain.gain.exponentialRampToValueAtTime(0.13,now+0.69+i*0.025);gain.gain.exponentialRampToValueAtTime(0.0001,now+2.2+i*0.08);osc.connect(gain);gain.connect(master);osc.start(now+0.65);osc.stop(now+2.3+i*0.08);});
+ const audio=document.getElementById('revolutionAudio');
+ if(!audio)return;
+ try{audio.pause();audio.currentTime=0;const result=audio.play();if(result&&typeof result.catch==='function')result.catch(()=>{});}catch(e){/* ブラウザが音声再生を制限した場合もゲームは続行 */}
 }
 function showRevolutionAnimation(isRevolution){
  const overlay=document.getElementById('revolutionOverlay');
  const title=document.getElementById('revolutionTitle');
+ const blackout=document.getElementById('revolutionBlackout');
  if(!overlay||!title)return;
  title.textContent=isRevolution?'革命！！':'革命返し！！';
  const balls=document.getElementById('revolutionBalls');
  if(balls){balls.innerHTML='';for(let i=0;i<42;i++){const ball=document.createElement('span');ball.className='revolution-ball';ball.style.setProperty('--x',(Math.random()*100)+'%');ball.style.setProperty('--size',(5+Math.random()*12)+'px');ball.style.setProperty('--duration',(1.1+Math.random()*1.9)+'s');ball.style.setProperty('--delay',(Math.random()*0.8)+'s');ball.style.setProperty('--drift',((Math.random()-.5)*180)+'px');balls.appendChild(ball);}}
- playRevolutionSound();
  overlay.classList.remove('show');
- void overlay.offsetWidth;
- overlay.classList.add('show');
- window.setTimeout(()=>overlay.classList.remove('show'),3800);
+ if(blackout){blackout.classList.remove('show');blackout.style.display='block';void blackout.offsetWidth;blackout.classList.add('show');}
+ // いったん暗転し、約0.55秒後に効果音と革命演出を開始する。
+ window.setTimeout(()=>{
+  if(blackout){blackout.classList.remove('show');blackout.style.display='none';}
+  playRevolutionSound();
+  void overlay.offsetWidth;
+  overlay.classList.add('show');
+  window.setTimeout(()=>overlay.classList.remove('show'),3800);
+ },550);
 }
-
 function current(){return state.players[state.turn]}
 
 function activeNames(){
@@ -1755,7 +1746,7 @@ function renderOnlineGame(g){
  const modal=document.getElementById('onlineGameModal');modal.classList.add('open');document.getElementById('onlineGameRoom').textContent=(onlineRoomCode||'')+' · ランク戦';
  const current=g.players[g.turn];let status=g.finished?'ゲーム終了：'+(g.finishOrder||[]).join(' → '):g.pendingQ?(g.pendingQ.mine?'Qボンバーの数字を選択してください':'Qボンバー処理中'):((g.myTurn?'あなたのターン':`${current?.name||'相手'}のターン`)+(g.firstMove?'（♦3を出して開始）':''));
  document.getElementById('onlineGameStatus').textContent=g.notice||status;const rr=document.getElementById('onlineRankResult');if(g.finished){rr.style.display='block';rr.innerHTML='';const title=document.createElement('strong');title.textContent=g.ranked?'ランク戦結果':'ゲーム結果';rr.append(title);const results=g.ranked&&(g.rankResults||[]).length?(g.rankResults||[]).map(x=>({...x,placeLabel:({2:x.place===1?'上がり！':'負け',3:x.place<=2?'上がり！':'3位',4:x.place<=2?'上がり！':x.place===3?'貧民':'大貧民',5:x.place<=2?'上がり！':x.place===3?'3位':x.place===4?'貧民':'大貧民'})[g.players.length]})):(g.players||[]).map(x=>({name:x.name,place:x.place,placeLabel:x.placeLabel||`${x.place}位`,delta:0,rp:null}));results.slice().sort((a,b)=>a.place-b.place).forEach(x=>{const line=document.createElement('div');line.textContent=`${x.place}位 ${x.name}：${x.placeLabel||`${x.place}位`}${g.ranked?`　${x.delta>0?'+':''}${x.delta} RP${x.rp===null?'':`（合計 ${x.rp} RP）`}`:''}`;rr.append(line);});if(onlineAccount&&g.ranked){const me=(g.rankResults||[]).find(x=>x.rp!==null&&x.name===document.getElementById('onlineName').value.trim().slice(0,6));if(me){onlineAccount.rp=me.rp;renderAccountStatus();}}}else{rr.style.display='none';rr.innerHTML='';}const ng=document.getElementById('onlineNewGameBtn'),hint=document.getElementById('onlineNewGameHint');ng.style.display=g.finished&&onlineIsHost?'block':'none';hint.style.display=g.finished&&!onlineIsHost?'block':'none';hint.textContent=g.finished&&!onlineIsHost?'ルーム作成者がニューゲームを開始するまでお待ちください。':'';
- const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const titleEl=document.createElement('small');titleEl.className='online-player-title';titleEl.textContent=p.title||'';titleEl.style.cssText='display:block;color:#ffe58b;font-weight:800;margin-top:3px';const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・${p.placeLabel||'上がり！'}`: `手札 ${p.handCount}枚`;d.append(b);if(p.title) d.append(titleEl);d.append(sm);ps.append(d);});
+ const ps=document.getElementById('onlineGamePlayers');ps.innerHTML='';g.players.forEach((p,i)=>{const d=document.createElement('div');d.className='online-game-player'+(i===g.turn&&!g.finished?' active':'');const b=document.createElement('strong');b.textContent=p.name+(p.isCPU?'（CPU）':'');const titleEl=document.createElement('small');titleEl.className='online-player-title';titleEl.textContent=p.title||'';titleEl.style.cssText='display:block;color:#ffe58b;font-weight:800;margin-top:3px';const sm=document.createElement('small');sm.textContent=p.finished?`${p.place}位・${p.placeLabel||'上がり！'}`: `手札 ${p.handCount}枚`;d.append(b);if(p.title) d.append(titleEl);if(p.jokerDisclosure){const disclosure=document.createElement('small');disclosure.className='joker-disclosure';disclosure.textContent='ジョーカー開示';d.append(disclosure);}d.append(sm);ps.append(d);});
  const table=document.getElementById('onlineGameTable');table.innerHTML='';if(g.table?.length)g.table.forEach(c=>table.append(makeOnlineCard(c,false,null)));else table.textContent='場にカードはありません';
  const effectBox=document.getElementById('onlineActiveEffects');effectBox.innerHTML='';const effectNames=[...(g.jBack?['Jバック（強さ逆転）']:[]),...(g.revolution?['革命（強さ逆転）']:[]),...(g.lockSuit?['縛り（'+g.lockSuit+'）']:[]),...((g.effects||[]))];if(g.jBackNineLock)effectNames.push('Jバック維持・特殊効果封印');if(g.neutralizeCount>0)effectNames.push('9能力無効化（残り'+g.neutralizeCount+'回）');if(effectNames.length){[...new Set(effectNames)].forEach(name=>{const chip=document.createElement('span');chip.className='online-effect-chip';chip.textContent=name;effectBox.append(chip);});}else effectBox.innerHTML='<span class="subtle">なし</span>';
  const hand=document.getElementById('onlineGameHand');hand.innerHTML='';const myHand=g.myHand||[];document.getElementById('onlineHandCount').textContent=`${myHand.length}枚`;
