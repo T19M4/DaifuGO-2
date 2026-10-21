@@ -4,6 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>大富豪 ローカル対戦</title>
 <style>
 :root{--felt:#064b37;--felt2:#033726;--gold:#ffd85a;--panel:#082f3c;--line:#3a8790}
@@ -391,6 +392,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div><label for="accountPassword">パスワード</label><input id="accountPassword" type="password" maxlength="128" autocomplete="current-password" placeholder="8文字以上"></div>
    </div>
    <div class="online-actions"><button id="registerAccountBtn" type="button">新規登録</button><button id="loginAccountBtn" type="button">ログイン</button><button id="logoutAccountBtn" type="button" style="background:#44535a;display:none">ログアウト</button></div>
+   <div class="online-actions"><button id="googleLoginBtn" type="button" style="background:#fff;color:#222;border:1px solid #ccc">Googleで新規登録・ログイン</button><button id="googleLinkBtn" type="button" style="background:#244753;display:none">現在のアカウントにGoogleを連携</button></div>
    <p id="accountStatus" class="subtle" aria-live="polite">未ログイン</p><p id="accountRankView" style="margin:3px 0;font-weight:800"></p>
   </div>
   <div class="account-panel" style="border:1px solid #52757b;border-radius:10px">
@@ -522,7 +524,7 @@ function newGame(){
 
  state={
   players,turn:start,deck:[],table:[],trickCards:[],lastCards:[],lastPlayer:-1,
-  passCount:0,selected:new Set(),jBack:false,jBackNineLock:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
+  passCount:0,selected:new Set(),stairLock:null,jBack:false,jBackNineLock:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
   finished:false,finishOrder:[],pendingQ:false,turnSerial:0,
   firstMove:true,eightCutPending:false,pendingDiscardCount:0,downNumberBaseRank:null
  };
@@ -706,6 +708,8 @@ function validSet(cards){
 
 function canBeat(cards){
  if(!validSet(cards))return false;
+ if(state.stairLock==='stair' && stairRanks(cards)===null)return false;
+ if(state.stairLock==='stairRevolution' && !(stairRanks(cards)!==null && cards.length>=4))return false;
 
  // ♦3の初手はplayCards側で指定する
  if(!state.table.length)return true;
@@ -783,6 +787,7 @@ function advance(n=1){
 
 function clearTrick(startIndex){
  state.table=[];
+ state.stairLock=null;
  state.trickCards=[];
  state.lastCards=[];
  state.passCount=0;
@@ -894,6 +899,7 @@ function playCards(cards,byCpu=false){
  removeCards(p,cards);
  state.selected.clear();
  state.table=cards.slice();
+ state.stairLock=selectedStairRanks?(cards.length>=4?'stairRevolution':'stair'):null;
  // ダウンナンバーは同じスートの前後1つの数字で連続できる。
  // ダウンナンバー以外のカードが出たら通常の比較に戻す。
  state.downNumberBaseRank=downNumberPlay ? (previousDownNumberBase!==null ? previousDownNumberBase : oldTable[0].rank) : null;
@@ -1708,13 +1714,17 @@ function onlineRequest(eventName,payload){
 }
 function renderAccountStatus(message=''){
  const status=document.getElementById('accountStatus'),rank=document.getElementById('accountRankView');
- if(onlineAccount){status.textContent='ログイン中：'+onlineAccount.username;rank.textContent=`RP：${onlineAccount.rp||0} ／ 対戦 ${onlineAccount.games||0}回 ／ 優勝 ${onlineAccount.wins||0}回`;document.getElementById('logoutAccountBtn').style.display='inline-block';}
- else{status.textContent=message||'未ログイン';rank.textContent='';document.getElementById('logoutAccountBtn').style.display='none';}
+ if(onlineAccount){status.textContent='ログイン中：'+onlineAccount.username;rank.textContent=`RP：${onlineAccount.rp||0} ／ 対戦 ${onlineAccount.games||0}回 ／ 優勝 ${onlineAccount.wins||0}回`;document.getElementById('logoutAccountBtn').style.display='inline-block';document.getElementById('googleLinkBtn').style.display=onlineAccount?'inline-block':'none';}
+ else{status.textContent=message||'未ログイン';rank.textContent='';document.getElementById('logoutAccountBtn').style.display='none';document.getElementById('googleLinkBtn').style.display='none';}
  if(document.getElementById('gachaRpView'))updateGachaProfileViews();
 }
 function authRequest(eventName){if(eventName==='authRegister'){const username=document.getElementById('accountUsername').value.trim();if(forbiddenOnlineName(username)){document.getElementById('accountStatus').textContent='このユーザー名は使用できません。禁止ワードが含まれています。';return;}}if(!onlineSocket){openOnlineModal();}if(!onlineSocket||!onlineSocket.connected){document.getElementById('accountStatus').textContent='サーバーに接続してから操作してください。';return;}const username=document.getElementById('accountUsername').value.trim(),password=document.getElementById('accountPassword').value;onlineSocket.emit(eventName,{username,password},result=>{if(!result?.ok){document.getElementById('accountStatus').textContent=result?.message||'認証に失敗しました。';return;}onlineAuthToken=result.token;onlineAccount=result.account;localStorage.setItem('daifugo2_auth_token',onlineAuthToken);document.getElementById('accountPassword').value='';renderAccountStatus();});}
 document.getElementById('registerAccountBtn').addEventListener('click',()=>authRequest('authRegister'));
 document.getElementById('loginAccountBtn').addEventListener('click',()=>authRequest('authLogin'));
+let googleClientId='';
+fetch(ONLINE_SERVER_URL+'/auth-config').then(r=>r.json()).then(cfg=>{googleClientId=cfg.googleClientId||'';const b=document.getElementById('googleLoginBtn');if(b&&!googleClientId)b.title='Google認証を利用するにはサーバー側の設定が必要です。';}).catch(()=>{});
+function runGoogleAuth(link=false){if(!googleClientId){document.getElementById('accountStatus').textContent='Google認証が未設定です。サーバーにGOOGLE_CLIENT_IDを設定してください。';return;}if(!window.google?.accounts?.id){document.getElementById('accountStatus').textContent='Google認証の読み込み中です。少し待ってから再度お試しください。';return;}window.google.accounts.id.initialize({client_id:googleClientId,callback:(response)=>{if(!onlineSocket||!onlineSocket.connected){document.getElementById('accountStatus').textContent='サーバーに接続してから操作してください。';return;}onlineSocket.emit('authGoogle',{idToken:response.credential,link},result=>{if(!result?.ok){document.getElementById('accountStatus').textContent=result?.message||'Google認証に失敗しました。';return;}if(result.token){onlineAuthToken=result.token;localStorage.setItem('daifugo2_auth_token',onlineAuthToken);}onlineAccount=result.account;renderAccountStatus(result.linked?'Googleアカウントを連携しました。':'');});}});window.google.accounts.id.prompt();}
+document.getElementById('googleLoginBtn').addEventListener('click',()=>runGoogleAuth(false));document.getElementById('googleLinkBtn').addEventListener('click',()=>runGoogleAuth(true));
 document.getElementById('logoutAccountBtn').addEventListener('click',()=>{if(!onlineSocket)return;onlineSocket.emit('authLogout',{},()=>{onlineAuthToken='';onlineAccount=null;localStorage.removeItem('daifugo2_auth_token');renderAccountStatus('ログアウトしました。');});});
 const GACHA_RARITIES=[{name:'ノーマル',chance:70,titles:['平民の希望','カードの手ほどき','一発逆転の兆し','かけだしのひよっこ','堅実なる手札使い','肉を食べるヴィーガン','お前開示だな']},{name:'ミドル',chance:24,titles:['場を支配する者','革命の扇動者','縛りの技巧派','切り札の潜伏者','おJJスターバックス⁉','チェックといいなさい','学校こい','YBLOVE','だから留年']},{name:'ハイスペック',chance:5,titles:['混沌のカードマスター','運命を決める先行チェック','大富豪の覇者','終焉の8切り','不敗のKING','借金']},{name:'レジェンド',chance:1,titles:['これチェックなんだよなぁ','天地開闢の革命','無慈悲なる大富豪','小林裕也を統べし者','伝説のカードエンペラー','Are you ready?']}];
 function updateGachaProfileViews(){document.getElementById('gachaRpView').textContent=onlineAccount?`所持RP：${onlineAccount.rp||0} RP`:'ログインするとガチャを回せます。';const select=document.getElementById('profileTitleSelect');select.innerHTML='';const none=document.createElement('option');none.value='';none.textContent='称号なし';select.append(none);const owned=onlineAccount?.ownedTitles||[];owned.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;if(t===(onlineAccount?.selectedTitle||''))o.selected=true;select.append(o);});document.getElementById('profileStatus').textContent=onlineAccount?`ログイン中：${onlineAccount.username}`:'ログインが必要です。オンラインモードからログインしてください。';document.getElementById('profileStats').textContent=onlineAccount?`RP：${onlineAccount.rp||0} ／ 対戦 ${onlineAccount.games||0}回 ／ 優勝 ${onlineAccount.wins||0}回` :'';const ownedView=document.getElementById('ownedTitlesView');ownedView.textContent=owned.length?owned.join(' ／ '):'称号をまだ所持していません。';document.getElementById('saveProfileBtn').disabled=!onlineAccount;document.getElementById('rollOneBtn').disabled=!onlineAccount;document.getElementById('rollTenBtn').disabled=!onlineAccount;}
