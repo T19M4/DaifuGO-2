@@ -447,11 +447,26 @@ io.on('connection',socket=>{
     if(account&&account.id!==current.id)return cb?.(authError('このGoogleアカウントは別のプレイヤーアカウントに連携済みです。'));
     current.googleSub=gPayload.sub;current.googleEmail=String(gPayload.email).toLowerCase();saveAccounts();return cb?.({ok:true,linked:true,account:safeAccount(current)});
    }
+   // 以前のバージョンで作られた google_xxxxx の仮ユーザー名は、初回の名前設定で置き換える。
+   const requestedUsername=String(payload.username||'').trim();
+   if(account && /^google_[a-f0-9]{10}$/i.test(account.username) && !requestedUsername){
+    return cb?.({ok:false,needsUsername:true,message:'プレイヤーネームを設定してください。'});
+   }
    if(!account){
-    // Google新規登録：既存のusername形式を保ちつつ衝突しにくい自動ユーザー名を作成。
-    let username='google_'+crypto.randomBytes(5).toString('hex'),key=normalizeUsername(username);
-    while(accounts[key]){username='google_'+crypto.randomBytes(5).toString('hex');key=normalizeUsername(username);}
-    account={id:crypto.randomUUID(),username,googleSub:gPayload.sub,googleEmail:String(gPayload.email).toLowerCase(),rp:0,games:0,wins:0,ownedTitles:[],selectedTitle:'',tokenHash:null};accounts[key]=account;saveAccounts();
+    if(!requestedUsername)return cb?.({ok:false,needsUsername:true,message:'プレイヤーネームを設定してください。'});
+    if(!validUsername(requestedUsername))return cb?.(authError('ユーザー名は英数字と_で3〜20文字にしてください。'));
+    if(forbiddenDisplayName(requestedUsername))return cb?.(authError('このユーザー名は使用できません。禁止ワードが含まれています。'));
+    const key=normalizeUsername(requestedUsername);
+    if(accounts[key])return cb?.(authError('そのユーザー名はすでに使われています。別の名前を設定してください。'));
+    account={id:crypto.randomUUID(),username:requestedUsername,googleSub:gPayload.sub,googleEmail:String(gPayload.email).toLowerCase(),rp:0,games:0,wins:0,ownedTitles:[],selectedTitle:'',tokenHash:null};
+    accounts[key]=account;saveAccounts();
+   }else if(requestedUsername && account.username!==requestedUsername){
+    // 既存のGoogle連携アカウント名を変更する場合は、衝突・禁止名を検査してからキーを移す。
+    if(!validUsername(requestedUsername))return cb?.(authError('ユーザー名は英数字と_で3〜20文字にしてください。'));
+    if(forbiddenDisplayName(requestedUsername))return cb?.(authError('このユーザー名は使用できません。禁止ワードが含まれています。'));
+    const oldKey=normalizeUsername(account.username),newKey=normalizeUsername(requestedUsername);
+    if(accounts[newKey] && accounts[newKey].id!==account.id)return cb?.(authError('そのユーザー名はすでに使われています。別の名前を設定してください.'));
+    if(oldKey!==newKey){delete accounts[oldKey];account.username=requestedUsername;accounts[newKey]=account;saveAccounts();}
    }
    cb?.(issueToken(socket,account));
   }catch(err){console.error('Google認証に失敗しました:',err.message);cb?.(authError('Google認証を確認できませんでした。設定とGoogleログインを確認してください。'));}
