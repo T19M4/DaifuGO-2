@@ -4,6 +4,9 @@ const { Server } = require('socket.io');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { OAuth2Client } = require('google-auth-library');
+const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+const googleOAuthClient = googleClientId ? new OAuth2Client(googleClientId) : null;
 // 永続化：DATABASE_URL が設定されていれば PostgreSQL を正本として使用。
 // DATABASE_URL がない開発環境では従来どおり accounts.json を使用する。
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -139,7 +142,7 @@ function publicPlayers(room){return room.players.map(p=>({name:p.name,title:p.ti
 function addLog(g,msg){g.logs.push(msg); if(g.logs.length>35)g.logs.shift();}
 function active(i,g){return !!g.players[i] && !g.players[i].finished && g.players[i].hand.length>0;}
 function nextActive(from,g,steps=1){let i=from; for(let n=0;n<steps;n++){let found=-1; for(let s=1;s<=g.players.length;s++){const j=(i+s)%g.players.length;if(active(j,g)){found=j;break;}} if(found<0)return -1; i=found;} return i;}
-function clearTrick(g,start){g.table=[];g.lastCards=[];g.lastPlayer=-1;g.passCount=0;g.lockSuit=null;g.eightPending=false;g.downBase=null;g.effects=[];g.neutralizeCount=0;g.jBack=false;g.jBackNineLock=false;g.trickHistory=[];g.turn=active(start,g)?start:nextActive(start,g); if(g.turn<0)g.finished=true; addLog(g,`場が流れました。${g.players[g.turn]?.name || ''}から再開。Jバックをリセットしました。`);}
+function clearTrick(g,start){g.table=[];g.stairLock=null;g.lastCards=[];g.lastPlayer=-1;g.passCount=0;g.lockSuit=null;g.eightPending=false;g.downBase=null;g.effects=[];g.neutralizeCount=0;g.jBack=false;g.jBackNineLock=false;g.trickHistory=[];g.turn=active(start,g)?start:nextActive(start,g); if(g.turn<0)g.finished=true; addLog(g,`場が流れました。${g.players[g.turn]?.name || ''}から再開。Jバックをリセットしました。`);}
 // 選択された順番を階段の並びとして扱い、ジョーカーにはその位置の数字を割り当てる。
 // 例：[6, Joker, 8] -> [6, 7, 8]。階段でない組み合わせは null。
 function stairRanks(cards){
@@ -163,6 +166,9 @@ function validSet(cards){
 }
 function canBeat(cards,g){
  if(!validSet(cards))return false;
+ // 階段・階段革命が出たら、場が流れるまで同じ種類だけで返せる。
+ if(g.stairLock==='stair' && stairRanks(cards)===null)return false;
+ if(g.stairLock==='stairRevolution' && !(stairRanks(cards)!==null && cards.length>=4))return false;
  if(g.firstMove)return cards.length===1&&cards[0].rank===3&&cards[0].suit==='♦';
  if(!g.table.length)return true;
  if(g.table.length===1&&cards.length===1&&cards[0].rank===16)return true;
@@ -182,9 +188,9 @@ function canBeat(cards,g){
  const top=g.table[0].rank;return power(cards[0].rank,g)>power(top,g);
 }
 function emitGame(code){const room=rooms.get(code);if(!room||!room.game)return;const g=room.game;if(g.finished)awardRankPoints(g);for(const p of room.players){const gp=g.players.find(x=>x.id===p.id);io.to(p.id).emit('onlineGameState',snapshot(g,gp));} }
-function snapshot(g,p){return {started:true,finished:g.finished,ranked:!!g.ranked,rankResults:g.rankResults||[],myRank:(p?.userId?Object.values(accounts).find(a=>a.id===p.userId)?.rp:null),players:g.players.map(x=>({name:x.name,title:x.title||'',jokerDisclosure:x.hand.filter(c=>c.rank===16).length>=2,isCPU:x.isCPU,handCount:x.hand.length,finished:x.finished,place:x.place||0,placeLabel:x.place?placeLabel(g.players.length,x.place):''})),myHand:p?p.hand:[],turn:g.turn,table:g.table,lastCards:g.lastCards,lastPlayer:g.lastPlayer,trickHistory:(g.trickHistory||[]).map(x=>({player:x.player,cards:x.cards})),fourStopSerial:g.fourStopSerial||0,jBackSerial:g.jBackSerial||0,revolutionSerial:g.revolutionSerial||0,qBombSerial:g.qBombSerial||0,qBombEvent:g.qBombEvent||null,firstMove:g.firstMove,eightPending:g.eightPending,jBack:g.jBack,jBackNineLock:g.jBackNineLock,revolution:g.revolution,lockSuit:g.lockSuit,downBase:g.downBase,neutralizeCount:g.neutralizeCount,effects:g.effects||[],pendingQ:g.pendingQ?{actor:g.pendingQ.actor,remaining:g.pendingQ.remaining,mine:!!p&&g.players[g.pendingQ.actor]?.id===p.id}:null,pendingChoice:g.pendingChoice?{type:g.pendingChoice.type,remaining:g.pendingChoice.remaining,mine:!!p&&g.players[g.pendingChoice.actor]?.id===p.id,recipientName:g.players[g.pendingChoice.recipient]?.name||''}:null,logs:g.logs,finishOrder:g.finishOrder,notice:g.notice||'',myTurn:!!p&&g.players[g.turn]?.id===p.id&&!g.finished&&!g.pendingQ};}
+function snapshot(g,p){return {started:true,finished:g.finished,ranked:!!g.ranked,rankResults:g.rankResults||[],myRank:(p?.userId?Object.values(accounts).find(a=>a.id===p.userId)?.rp:null),players:g.players.map(x=>({name:x.name,title:x.title||'',jokerDisclosure:x.hand.filter(c=>c.rank===16).length>=2,isCPU:x.isCPU,handCount:x.hand.length,finished:x.finished,place:x.place||0,placeLabel:x.place?placeLabel(g.players.length,x.place):''})),myHand:p?p.hand:[],turn:g.turn,table:g.table,lastCards:g.lastCards,lastPlayer:g.lastPlayer,trickHistory:(g.trickHistory||[]).map(x=>({player:x.player,cards:x.cards})),fourStopSerial:g.fourStopSerial||0,jBackSerial:g.jBackSerial||0,revolutionSerial:g.revolutionSerial||0,qBombSerial:g.qBombSerial||0,qBombEvent:g.qBombEvent||null,firstMove:g.firstMove,stairLock:g.stairLock||null,eightPending:g.eightPending,jBack:g.jBack,jBackNineLock:g.jBackNineLock,revolution:g.revolution,lockSuit:g.lockSuit,downBase:g.downBase,neutralizeCount:g.neutralizeCount,effects:g.effects||[],pendingQ:g.pendingQ?{actor:g.pendingQ.actor,remaining:g.pendingQ.remaining,mine:!!p&&g.players[g.pendingQ.actor]?.id===p.id}:null,pendingChoice:g.pendingChoice?{type:g.pendingChoice.type,remaining:g.pendingChoice.remaining,mine:!!p&&g.players[g.pendingChoice.actor]?.id===p.id,recipientName:g.players[g.pendingChoice.recipient]?.name||''}:null,logs:g.logs,finishOrder:g.finishOrder,notice:g.notice||'',myTurn:!!p&&g.players[g.turn]?.id===p.id&&!g.finished&&!g.pendingQ};}
 function broadcastLobby(code){const r=rooms.get(code);if(r)io.to(code).emit('playersUpdated',publicPlayers(r));}
-function startGame(code){const room=rooms.get(code);if(!room||(room.game&&!room.game.finished))return;room.game=null;const players=room.players.map(p=>{const a=p.userId?Object.values(accounts).find(x=>x.id===p.userId):null;return {id:p.id,userId:p.userId||null,username:p.username||null,name:p.name,title:a?.selectedTitle||'',isCPU:false,hand:[],finished:false};});const deck=[];for(const s of SUITS)for(const r of RANKS)deck.push({id:`${s}${r}`,suit:s,rank:r});deck.push({id:'joker1',suit:'',rank:16},{id:'joker2',suit:'',rank:16});shuffle(deck);deck.forEach((c,i)=>players[i%players.length].hand.push(c));players.forEach(p=>p.hand.sort((a,b)=>a.rank-b.rank||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)));const turn=players.findIndex(p=>p.hand.some(c=>c.suit==='♦'&&c.rank===3));room.game={ranked:!!room.ranked,rankApplied:false,rankResults:[],players,turn,table:[],lastCards:[],lastPlayer:-1,passCount:0,firstMove:true,eightPending:false,jBack:false,revolution:false,lockSuit:null,downBase:null,neutralizeCount:0,jBackNineLock:false,pendingQ:null,pendingChoice:null,pendingActions:[],pendingSkip:0,pendingActor:-1,finished:false,finishOrder:[],logs:[],effects:[],trickHistory:[],downSequence:false,fourStopSerial:0,jBackSerial:0,revolutionSerial:0,qBombSerial:0,qBombEvent:null,notice:`ゲーム開始。♦3を持つ${players[turn].name}から開始。`};addLog(room.game,room.game.notice);emitGame(code);}
+function startGame(code){const room=rooms.get(code);if(!room||(room.game&&!room.game.finished))return;room.game=null;const players=room.players.map(p=>{const a=p.userId?Object.values(accounts).find(x=>x.id===p.userId):null;return {id:p.id,userId:p.userId||null,username:p.username||null,name:p.name,title:a?.selectedTitle||'',isCPU:false,hand:[],finished:false};});const deck=[];for(const s of SUITS)for(const r of RANKS)deck.push({id:`${s}${r}`,suit:s,rank:r});deck.push({id:'joker1',suit:'',rank:16},{id:'joker2',suit:'',rank:16});shuffle(deck);deck.forEach((c,i)=>players[i%players.length].hand.push(c));players.forEach(p=>p.hand.sort((a,b)=>a.rank-b.rank||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)));const turn=players.findIndex(p=>p.hand.some(c=>c.suit==='♦'&&c.rank===3));room.game={ranked:!!room.ranked,rankApplied:false,rankResults:[],players,turn,table:[],lastCards:[],lastPlayer:-1,passCount:0,firstMove:true,eightPending:false,jBack:false,revolution:false,lockSuit:null,downBase:null,neutralizeCount:0,jBackNineLock:false,pendingQ:null,pendingChoice:null,pendingActions:[],pendingSkip:0,pendingActor:-1,finished:false,finishOrder:[],logs:[],effects:[],trickHistory:[],downSequence:false,fourStopSerial:0,jBackSerial:0,revolutionSerial:0,qBombSerial:0,qBombEvent:null,stairLock:null,notice:`ゲーム開始。♦3を持つ${players[turn].name}から開始。`};addLog(room.game,room.game.notice);emitGame(code);}
 function finishCheck(g,p){
  if(p.hand.length!==0)return false;
  const n=g.players.length;
@@ -264,7 +270,7 @@ function doPlay(code,playerId,ids){
  const qToJBack=oldTable.length===1&&cards.length===1&&oldTable[0].rank===12&&cards[0].rank===11&&cards[0].suit===oldTable[0].suit;
  const down=!qToJBack&&oldTable.length===1&&cards.length===1&&cards[0].rank!==16&&oldTable[0].rank!==16&&cards[0].suit===oldTable[0].suit&&Math.abs(cards[0].rank-oldTable[0].rank)===1;
  const oldLock=g.lockSuit,selectedStairRanks=stairRanks(cards),effectiveRanks=selectedStairRanks||cards.map(c=>c.rank),jPlayedEarlier=g.trickHistory.some(x=>(x.effectiveRanks||x.cards.map(c=>c.rank)).includes(11));
- p.hand=p.hand.filter(c=>!wanted.has(c.id));g.table=cards;g.lastCards=cards;g.lastPlayer=g.turn;g.passCount=0;g.firstMove=false;g.downBase=down?(g.downBase!==null?g.downBase:oldTable[0].rank):null;g.trickHistory.push({player:p.name,cards:cards.slice(),effectiveRanks:effectiveRanks.slice()});
+ p.hand=p.hand.filter(c=>!wanted.has(c.id));g.table=cards;g.stairLock=selectedStairRanks?(cards.length>=4?'stairRevolution':'stair'):null;g.lastCards=cards;g.lastPlayer=g.turn;g.passCount=0;g.firstMove=false;g.downBase=down?(g.downBase!==null?g.downBase:oldTable[0].rank):null;g.trickHistory.push({player:p.name,cards:cards.slice(),effectiveRanks:effectiveRanks.slice()});
  if(wasOccupied&&oldTable.length&&cards.every(c=>c.suit&&c.suit===cards[0].suit)&&oldTable.every(c=>c.suit&&c.suit===oldTable[0].suit)&&cards[0].suit===oldTable[0].suit)g.lockSuit=cards[0].suit;else if(!wasOccupied)g.lockSuit=null;else g.lockSuit=oldLock&&cards.every(c=>c.suit===oldLock)?oldLock:null;
  addLog(g,`${p.name}：${cards.map(cardText).join(' ')}`);if(qToJBack)addLog(g,'QのあとにJ：ダウンナンバーを解除し、Jバックを発動します。');else if(down)addLog(g,'ダウンナンバー！');
  if(!g.jBackNineLock&&g.jBack&&jPlayedEarlier&&effectiveRanks.includes(9)){g.jBackNineLock=true;addLog(g,'Jバック＋9：Jバックは維持。以降の特殊効果を場が流れるまで封印。');}
@@ -423,10 +429,33 @@ function leaveRoom(socket){
  if(room.hostId===socket.id)room.hostId=room.players[0].id;
  broadcastLobby(code);
 }
+app.get('/auth-config',(_req,res)=>{res.set('Access-Control-Allow-Origin','*');res.set('Cache-Control','no-store');res.json({googleClientId:googleClientId||null});});
 app.get('/',(_req,res)=>res.send('DaifuGO-2 online server is running.'));
 io.on('connection',socket=>{
  socket.on('authRegister',(payload={},cb)=>{const username=String(payload.username||'').trim();const key=normalizeUsername(username);const password=String(payload.password||'');if(!validUsername(username))return cb?.(authError('ユーザー名は英数字と_で3〜20文字にしてください。'));if(forbiddenDisplayName(username))return cb?.(authError('このユーザー名は使用できません。禁止ワードが含まれています。'));if(password.length<8||password.length>128)return cb?.(authError('パスワードは8〜128文字にしてください。'));if(accounts[key])return cb?.(authError('そのユーザー名はすでに使われています。'));const salt=crypto.randomBytes(16).toString('hex');const a={id:crypto.randomUUID(),username,salt,passwordHash:hashPassword(password,salt),rp:0,games:0,wins:0,ownedTitles:[],selectedTitle:'',tokenHash:null};accounts[key]=a;const result=issueToken(socket,a);cb?.(result);});
  socket.on('authLogin',(payload={},cb)=>{purgeForbiddenAccounts();const username=String(payload.username||'').trim(),key=normalizeUsername(username),password=String(payload.password||''),a=accounts[key];if(!a)return cb?.(authError('ユーザー名またはパスワードが違います。'));if(forbiddenDisplayName(a.username)){delete accounts[key];saveAccounts();return cb?.(authError('このアカウントは利用できません。'));}const candidate=Buffer.from(hashPassword(password,a.salt),'hex');const stored=Buffer.from(a.passwordHash,'hex');if(candidate.length!==stored.length||!crypto.timingSafeEqual(candidate,stored))return cb?.(authError('ユーザー名またはパスワードが違います。'));cb?.(issueToken(socket,a));});
+ socket.on('authGoogle',async(payload={},cb)=>{
+  try{
+   if(!googleOAuthClient||!googleClientId)return cb?.(authError('Google認証が未設定です。RenderにGOOGLE_CLIENT_IDを設定してください。'));
+   const idToken=String(payload.idToken||'');if(!idToken)return cb?.(authError('Google認証トークンがありません。'));
+   const ticket=await googleOAuthClient.verifyIdToken({idToken,audience:googleClientId});const gPayload=ticket.getPayload();
+   if(!gPayload?.sub||!gPayload.email||!gPayload.email_verified)return cb?.(authError('確認済みのGoogleアカウントを使用してください。'));
+   let account=Object.values(accounts).find(a=>a.googleSub===gPayload.sub);
+   const current=accountForSocket(socket);
+   if(payload.link===true){
+    if(!current)return cb?.(authError('既存アカウントにログインしてから連携してください。'));
+    if(account&&account.id!==current.id)return cb?.(authError('このGoogleアカウントは別のプレイヤーアカウントに連携済みです。'));
+    current.googleSub=gPayload.sub;current.googleEmail=String(gPayload.email).toLowerCase();saveAccounts();return cb?.({ok:true,linked:true,account:safeAccount(current)});
+   }
+   if(!account){
+    // Google新規登録：既存のusername形式を保ちつつ衝突しにくい自動ユーザー名を作成。
+    let username='google_'+crypto.randomBytes(5).toString('hex'),key=normalizeUsername(username);
+    while(accounts[key]){username='google_'+crypto.randomBytes(5).toString('hex');key=normalizeUsername(username);}
+    account={id:crypto.randomUUID(),username,googleSub:gPayload.sub,googleEmail:String(gPayload.email).toLowerCase(),rp:0,games:0,wins:0,ownedTitles:[],selectedTitle:'',tokenHash:null};accounts[key]=account;saveAccounts();
+   }
+   cb?.(issueToken(socket,account));
+  }catch(err){console.error('Google認証に失敗しました:',err.message);cb?.(authError('Google認証を確認できませんでした。設定とGoogleログインを確認してください。'));}
+ });
  socket.on('authResume',(payload={},cb)=>{purgeForbiddenAccounts();const token=String(payload.token||'');if(!/^[a-f0-9]{64}$/.test(token))return cb?.(authError('ログイン情報が無効です。'));const hash=crypto.createHash('sha256').update(token).digest('hex');const a=Object.values(accounts).find(x=>x.tokenHash===hash);if(!a)return cb?.(authError('ログイン情報の期限が切れています。もう一度ログインしてください。'));socket.data.userId=a.id;sessions.set(token,a.id);attemptReconnect(socket,a);cb?.({ok:true,account:safeAccount(a)});});
  socket.on('authLogout',(_payload,cb)=>{const a=accountForSocket(socket);if(a){a.tokenHash=null;saveAccounts();}leaveRoom(socket);socket.data.userId=null;cb?.({ok:true});});
  socket.on('rollTitleGacha',(payload={},cb)=>{const a=accountForSocket(socket);if(!a)return cb?.(authError('ガチャを回すにはログインしてください。'));const count=Number(payload.count);if(count!==1&&count!==10)return cb?.({ok:false,message:'1連または10連を選択してください。'});const cost=count===1?200:900;if((a.rp||0)<cost)return cb?.({ok:false,message:`RPが足りません（必要：${cost} RP）。`});a.rp=(a.rp||0)-cost;if(!Array.isArray(a.ownedTitles))a.ownedTitles=[];const results=[];for(let i=0;i<count;i++){const draw=drawTitle(),duplicate=a.ownedTitles.includes(draw.title);if(!duplicate)a.ownedTitles.push(draw.title);results.push({...draw,duplicate});}saveAccounts();cb?.({ok:true,spent:cost,results,account:safeAccount(a)});});
