@@ -104,7 +104,7 @@ function safeAccount(a){ const today=new Date().toLocaleDateString('sv-SE',{time
 const GACHA_RARITIES=[{name:'ノーマル',chance:70,titles:['平民の希望','カードの手ほどき','一発逆転の兆し','かけだしのひよっこ','堅実なる手札使い','肉を食べるヴィーガン','お前開示だな']},{name:'ミドル',chance:24,titles:['場を支配する者','革命の扇動者','縛りの技巧派','切り札の潜伏者','おJJスターバックス⁉','チェックといいなさい','学校こい','YBLOVE','だから留年']},{name:'ハイスペック',chance:5,titles:['混沌のカードマスター','運命を決める先行チェック','大富豪の覇者','終焉の8切り','不敗のKING','借金']},{name:'レジェンド',chance:1,titles:['これチェックなんだよなぁ','天地開闢の革命','無慈悲なる大富豪','小林裕也を統べし者','伝説のカードエンペラー','Are you ready?']}];
 function drawTitle(){const n=Math.random()*100;let rarity=n<70?GACHA_RARITIES[0]:n<94?GACHA_RARITIES[1]:n<99?GACHA_RARITIES[2]:GACHA_RARITIES[3];return {rarity:rarity.name,title:rarity.titles[Math.floor(Math.random()*rarity.titles.length)]};}
 function authError(message){ return {ok:false,message}; }
-function issueToken(socket,account){ const token=crypto.randomBytes(32).toString('hex'); account.tokenHash=crypto.createHash('sha256').update(token).digest('hex'); saveAccounts(); socket.data.userId=account.id; sessions.set(token,account.id); attemptReconnect(socket,account); return {ok:true,token,account:safeAccount(account)}; }
+function issueToken(socket,account){ if(!account.welcomeRpClaimed){account.rp=(Number(account.rp)||0)+500;account.welcomeRpClaimed=true;account.welcomeRpClaimedAt=new Date().toISOString();} const token=crypto.randomBytes(32).toString('hex'); account.tokenHash=crypto.createHash('sha256').update(token).digest('hex'); saveAccounts(); socket.data.userId=account.id; sessions.set(token,account.id); attemptReconnect(socket,account); return {ok:true,token,account:safeAccount(account)}; }
 function accountForSocket(socket){ return Object.values(accounts).find(a=>a.id===socket.data.userId) || null; }
 function rankedDelta(playerCount, place){ const table = playerCount===2 ? [200,-200] : playerCount===3 ? [200,0,-200] : playerCount===4 ? [300,200,-200,-300] : [300,200,0,-200,-300]; const value=table[Math.max(0,Math.min(playerCount-1,(place||playerCount)-1))]; return Number.isFinite(value)?value:0; }
 function placeLabel(playerCount, place){ if(playerCount===2)return place===1?'上がり！':'負け'; if(playerCount===3)return place<=2?'上がり！':'3位'; if(playerCount===4)return place<=2?'上がり！':place===3?'貧民':'大貧民'; if(playerCount===5)return place<=2?'上がり！':place===3?'3位':place===4?'貧民':'大貧民'; return `${place}位`; }
@@ -287,7 +287,7 @@ function doPlay(code,playerId,ids){
    : cards.filter(c=>c.rank===r).length+(jokerSub&&cards.some(c=>c.rank===r)?1:0);
   skip=count(5);if(skip)g.effects.push(`5スキップ（${skip}回）`);
   const give=count(7);if(give){g.effects.push(`7渡し（${give}枚）`);const recipient=nextActive(g.turn,g),remaining=Math.min(give,p.hand.length);if(remaining>0&&recipient>=0)g.pendingActions.push({type:'give',actor:g.turn,recipient,remaining});}
-  if(count(8)>0){g.effects.push(`8切り（${count(8)}枚）`);g.eightPending=true;addLog(g,'8切り：4止めの機会です。');}
+  if(count(8)>0){g.effects.push(`8切り（${count(8)}枚）`);g.eightPending=true;g.passCount=0;addLog(g,'8切り：全員に4止めの機会を回します。全員がパスした場合、8を出した人から再開します。');}
   if(count(9)>0){g.effects.push('9能力無効化');g.neutralizeCount=Math.max(g.neutralizeCount,count(9));addLog(g,`9の効果：次の${g.neutralizeCount}回の特殊効果を無効化。`);}
   const discard=count(10);if(discard){g.effects.push(`10捨て（${discard}枚）`);const remaining=Math.min(discard,p.hand.length);if(remaining>0)g.pendingActions.push({type:'discard',actor:g.turn,remaining});}
   // ダウンナンバーでJを出した場合も、通常どおりJバックを発動する。
@@ -304,7 +304,7 @@ function doPlay(code,playerId,ids){
  if(finishCheck(g,p)){emitGame(code);return;}
  advanceAfterPlay(code,g.turn,skip);
 }
-function doPass(code,playerId){const room=rooms.get(code),g=room?.game;if(!g||g.finished||g.pendingQ||g.pendingChoice)return;const p=g.players[g.turn];if(!p||p.id!==playerId||p.isCPU)return;if(g.firstMove||!g.table.length)return;addLog(g,`${p.name}はパス。`);if(g.eightPending){clearTrick(g,g.lastPlayer>=0?g.lastPlayer:g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}g.passCount++;const activeCount=g.players.filter((_,i)=>active(i,g)).length;if(g.passCount>=Math.max(1,activeCount-1)){clearTrick(g,g.lastPlayer>=0?g.lastPlayer:g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}g.turn=nextActive(g.turn,g);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);}
+function doPass(code,playerId){const room=rooms.get(code),g=room?.game;if(!g||g.finished||g.pendingQ||g.pendingChoice)return;const p=g.players[g.turn];if(!p||p.id!==playerId||p.isCPU)return;if(g.firstMove||!g.table.length)return;addLog(g,`${p.name}はパス。`);if(g.eightPending){g.passCount=(g.passCount||0)+1;const activeCount=g.players.filter((_,i)=>active(i,g)).length;const requiredPasses=Math.max(1,activeCount-1);if(g.passCount>=requiredPasses){const eightPlayer=g.lastPlayer>=0?g.lastPlayer:g.turn;clearTrick(g,eightPlayer);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}g.turn=nextActive(g.turn,g);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}g.passCount++;const activeCount=g.players.filter((_,i)=>active(i,g)).length;if(g.passCount>=Math.max(1,activeCount-1)){clearTrick(g,g.lastPlayer>=0?g.lastPlayer:g.turn);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}g.turn=nextActive(g.turn,g);emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);}
 function cpuCardPriority(cards){
  // まず中位札を使い、3・4・6の温存を優先。A(1)・2・ジョーカーはさらに温存する。
  const rank = cards.find(c=>c.rank!==16)?.rank ?? 16;
@@ -377,6 +377,7 @@ function applyDisconnectPenalty(code,index){
  if(!gp||!gp.disconnected||gp.forfeited||gp.finished)return;
  gp.reconnectTimer=null;
  gp.forfeited=true;
+ g.afkForfeitTriggered=true;
  gp.finished=true;
  gp.place=g.players.length;
  gp.hand=[];
@@ -413,6 +414,14 @@ function leaveRoom(socket){
   const index=g.players.findIndex(p=>p.id===socket.id);
   const gp=index>=0?g.players[index]:null;
   if(gp&&!gp.finished&&!gp.forfeited&&!gp.disconnected){
+   if(g.afkForfeitTriggered){
+    gp.safeExit=true;gp.finished=true;gp.place=g.players.length;gp.hand=[];
+    addLog(g,`${gp.name}はAFK退出者発生後の退出のため、退出ペナルティなしで退出しました。`);
+    if(g.turn===index){const next=nextActive(index,g);if(next>=0)g.turn=next;else g.finished=true;}
+    const remaining=g.players.filter(x=>!x.finished);
+    if(!g.finished&&remaining.length<=1){g.finished=true;const lastp=remaining[0];if(lastp){lastp.finished=true;if(!lastp.place)lastp.place=g.players.filter(x=>x.finished&&!x.forfeited&&!x.penaltyFinish&&!x.safeExit).length||1;}g.players.forEach(x=>{if(!x.place)x.place=g.players.length;});}
+    emitGame(code);broadcastLobby(code);return;
+   }
    gp.disconnected=true;gp.isCPU=false;gp.disconnectedAt=Date.now();
    if(!gp.name.endsWith('（接続待ち）'))gp.name+='（接続待ち）';
    addLog(g,`${gp.name}が切断されました。60秒以内に復帰しなければ最下位・-400RPとなります。CPUによる代打は行いません。`);
