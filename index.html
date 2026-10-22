@@ -112,6 +112,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .jj-bubble{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;pointer-events:none;z-index:5004;color:#fff;font-size:clamp(25px,5vw,58px);font-weight:1000;text-align:center;white-space:nowrap;text-shadow:0 4px 0 #8b1c1c,0 0 18px #ffec62,3px 6px 12px #000;background:linear-gradient(135deg,#ff3b3b,#ff8a00,#ffdf3d);border:4px solid #fff6a6;border-radius:24px;padding:18px 24px;box-shadow:0 0 0 6px #ff3b3b88,0 0 38px #ffdf3d}
 .jj-bubble.show{animation:jj-shout 1.6s cubic-bezier(.2,.8,.2,1) both}
 @keyframes jj-shout{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(-12deg)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.2) rotate(5deg)}24%{transform:translate(-50%,-50%) scale(.95) rotate(-3deg)}36%{transform:translate(-50%,-50%) scale(1.05) rotate(2deg)}72%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(8deg)}}
+.spade3-bubble{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.2) rotate(-18deg);opacity:0;pointer-events:none;z-index:6000;color:#fff;font-size:clamp(30px,7vw,76px);font-weight:1000;text-align:center;white-space:nowrap;text-shadow:0 4px 0 #073d91,0 0 18px #8eeaff,3px 6px 12px #000;background:linear-gradient(135deg,#061b52,#087ed1,#42e8ff);border:5px solid #d8faff;border-radius:26px;padding:20px 30px;box-shadow:0 0 0 7px #16baff88,0 0 42px #38ddff}
+.spade3-bubble.show{animation:spade3-shout 1.7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes spade3-shout{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(-18deg)}14%{opacity:1;transform:translate(-50%,-50%) scale(1.2) rotate(5deg)}27%{transform:translate(-50%,-50%) scale(.95) rotate(-3deg)}42%{transform:translate(-50%,-50%) scale(1.05) rotate(1deg)}76%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.55) rotate(10deg)}}
 .revolution-blackout{position:fixed;inset:0;background:#000;opacity:0;display:none;z-index:5002;pointer-events:none}.revolution-blackout.show{display:block;animation:revolution-blackout-in .55s ease both}.revolution-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:5003;pointer-events:none;overflow:hidden;background:radial-gradient(circle at center,#fff6a8f5 0%,#ffb000ed 22%,#f33a00e8 48%,#250044ed 78%);}
 .revolution-overlay.show{display:flex;animation:revolution-screen 3.8s ease both}
 .revolution-lights{position:absolute;inset:7%;border:8px dotted #fff5a6;border-radius:30px;box-shadow:inset 0 0 35px #fff,0 0 35px #ffd700;animation:revolution-lights 0.18s steps(2,end) infinite;}
@@ -388,6 +391,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 <div id="fourStopBubble" class="fourstop-bubble" aria-live="polite">止め価値あり！</div>
 <div id="jjBubble" class="jj-bubble" aria-live="polite">おJJスターバックスバックス！？</div>
+<div id="spade3Bubble" class="spade3-bubble" aria-live="polite">♠3返し！！</div>
 <div id="revolutionBlackout" class="revolution-blackout" aria-hidden="true"></div><audio id="revolutionAudio" preload="auto"><source src="free_sound1055.mp3" type="audio/mpeg"></audio>
 <div id="revolutionOverlay" class="revolution-overlay" aria-hidden="true"><div class="revolution-rays"></div><div class="revolution-lights"></div><div class="revolution-balls" id="revolutionBalls"></div><div class="revolution-jackpot">SUPER JACKPOT</div><div class="revolution-title" id="revolutionTitle">革命！！</div></div>
 <div id="onlineEffectToast" class="online-effect-toast" aria-live="polite"></div>
@@ -575,6 +579,14 @@ function showJJBubble(){
  bubble.classList.add('show');
 }
 
+function showSpade3Animation(){
+ const bubble=document.getElementById('spade3Bubble');
+ if(!bubble)return;
+ bubble.classList.remove('show');
+ void bubble.offsetWidth;
+ bubble.classList.add('show');
+}
+
 let revolutionAudioContext=null;
 function playRevolutionSound(){
  const audio=document.getElementById('revolutionAudio');
@@ -729,8 +741,11 @@ function canBeat(cards){
 
  // ♦3の初手はplayCards側で指定する
  if(!state.table.length)return true;
- // 場のカードが1枚なら、ジョーカーは強さ・縛り・効果待ちなどの条件に関係なく出せる。
- if(state.table.length===1&&cards.length===1&&cards[0].rank===16)return true;
+ // 場がジョーカー1枚だけの場合、返せるのは条件を満たす♠3だけ。
+ // ジョーカー重ね・通常カード・その他のカードはすべて禁止。
+ if(state.table.length===1&&state.table[0].rank===16){
+  return !state.jBackNineLock && !state.table.some(c=>c.rank===9) && cards.length===1 && cards[0].rank===3 && cards[0].suit==='♠';
+ }
 
  // 8切り待機中は、他プレイヤーが出せるのは4の2枚、または4＋ジョーカーだけ。
  // それ以外のカードで8切りを上書きすることはできない。
@@ -743,9 +758,6 @@ function canBeat(cards){
  // 革命やJバック中でも、縛りによってジョーカーが出せなくならないようにする。
  if(state.lockSuit && cards.length===1 && cards[0].rank===16 &&
     !state.table.some(c=>c.rank===16))return true;
- // 場にジョーカーがあり、場に9が含まれていなければ♠3返しができる。
- if(state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&
-    cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠')return true;
 
  // ジョーカーを含む出し方は縛りを無視する。それ以外は縛りに従う。
  if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
@@ -1085,6 +1097,7 @@ function playCards(cards,byCpu=false){
  if(spadeThreeReversal){
   state.effects.push('♠3返し');
   clearNow=true;
+  showSpade3Animation();
   log('♠3返し！ジョーカーを上書きした'+p.name+'が続けて行動します');
  }
 
@@ -1704,6 +1717,7 @@ let lastOnlineFourStopSerial = 0;
 let lastOnlineJBackSerial = 0;
 let lastOnlineRevolutionSerial = 0;
 let lastOnlineQBombSerial = 0;
+let lastOnlineSpade3Serial = 0;
 let lastOnlineJBackValue = false;
 let lastOnlineRevolutionValue = false;
 function openOnlineModal(){
@@ -1714,7 +1728,7 @@ function openOnlineModal(){
   onlineSocket.on('connect',()=>{if(onlineAuthToken)onlineSocket.emit('authResume',{token:onlineAuthToken},result=>{if(result?.ok){onlineAccount=result.account;renderAccountStatus();}else{onlineAuthToken='';localStorage.removeItem('daifugo2_auth_token');onlineAccount=null;renderAccountStatus(result?.message||'再ログインしてください。');}});});
   onlineSocket.on('connect_error',()=>{document.getElementById('onlineError').textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
   onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
-  onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}if((data.jBackSerial||0)>lastOnlineJBackSerial){lastOnlineJBackSerial=data.jBackSerial;showJJBubble();}if((data.revolutionSerial||0)>lastOnlineRevolutionSerial){lastOnlineRevolutionSerial=data.revolutionSerial;showRevolutionAnimation(!!data.revolution);}if((data.qBombSerial||0)>lastOnlineQBombSerial){lastOnlineQBombSerial=data.qBombSerial;showOnlineEffectToast('Qボンバー！ '+onlineRankName(data.qBombEvent?.rank));}});
+  onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}if((data.jBackSerial||0)>lastOnlineJBackSerial){lastOnlineJBackSerial=data.jBackSerial;showJJBubble();}if((data.revolutionSerial||0)>lastOnlineRevolutionSerial){lastOnlineRevolutionSerial=data.revolutionSerial;showRevolutionAnimation(!!data.revolution);}if((data.qBombSerial||0)>lastOnlineQBombSerial){lastOnlineQBombSerial=data.qBombSerial;showOnlineEffectToast('Qボンバー！ '+onlineRankName(data.qBombEvent?.rank));}if((data.spade3Serial||0)>lastOnlineSpade3Serial){lastOnlineSpade3Serial=data.spade3Serial;showSpade3Animation();}});
   onlineSocket.on('onlineActionError',msg=>{document.getElementById('onlineGameStatus').textContent=msg;});
   onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。';resetOnlineLobby();});
  }
