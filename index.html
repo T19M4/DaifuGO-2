@@ -899,7 +899,7 @@ function finishIfNeeded(p){
    state.finishOrder=state.players.slice().sort((a,b)=>(a.place||state.players.length)-(b.place||state.players.length)).map(x=>x.name+'（'+x.place+'位・'+offlinePlaceLabel(x)+'）');
    log('ゲーム終了：'+state.finishOrder.join(' → '));
    // 「あなた」が1位なら+20RP。6連勝・10連勝の追加報酬はサーバー側で計算する。
-   if(!state.cpuRewardSent){state.cpuRewardSent=true;if(onlineSocket&&onlineAccount){onlineSocket.emit('cpuMatchResult',{firstPlace:state.players[0].place===1},result=>{if(result?.ok&&result.account){onlineAccount=result.account;renderAccountStatus();render();const popup=result.account.cpuWinStreak>0&&state.players[0].place===1?`＋20 RP${result.message.includes('6連勝ボーナス')?' ＋30 RP':''}${result.message.includes('ガチャチケット')?' ＋ガチャチケット1枚':''}`:result.message;showOnlineEffectToast(popup||result.message||'CPU戦報酬を受け取りました。');log(result.message||'CPU戦報酬を受け取りました。');}});}}
+   if(!state.cpuRewardSent){state.cpuRewardSent=true;const firstPlace=Number(state.players[0].place)===1;if(!onlineSocket||!onlineSocket.connected){const msg='オフライン戦の報酬を保存できませんでした。サーバー未接続です。オンライン画面でログイン状態と接続を確認してから、もう一度対戦してください。';showOnlineEffectToast(msg);log(msg);}else{onlineSocket.emit('cpuMatchResult',{firstPlace},result=>{if(result?.ok&&result.account){onlineAccount=result.account;renderAccountStatus();render();let popup=result.message||'CPU戦報酬を受け取りました。';if(firstPlace){popup='＋20 RP'+(result.message?.includes('6連勝ボーナス')?' ＋30 RP':'')+(result.message?.includes('ガチャチケット')?' ＋ガチャチケット1枚':'');}showOnlineEffectToast(popup);log(result.message||popup);}else{const msg=result?.message||'CPU戦報酬の保存に失敗しました。ログイン状態を確認してください。';showOnlineEffectToast(msg);log(msg);}});}}
    return true;
   }
  }
