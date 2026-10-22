@@ -101,7 +101,7 @@ function purgeForbiddenAccounts(){ let changed=false; for(const [key,account] of
 function validUsername(v){ return /^[a-zA-Z0-9_]{3,20}$/.test(String(v||'')); }
 function hashPassword(password,salt){ return crypto.scryptSync(String(password),salt,64).toString('hex'); }
 function safeAccount(a){ const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});return {username:a.username,rp:a.rp||0,games:a.games||0,wins:a.wins||0,ownedTitles:Array.isArray(a.ownedTitles)?a.ownedTitles:[],selectedTitle:a.selectedTitle||'',unlockedEffects:Array.isArray(a.unlockedEffects)?a.unlockedEffects:[],selectedEffect:a.selectedEffect||'',loginBonus:{day:Number(a.loginBonus?.day)||0,lastClaimDate:a.loginBonus?.lastClaimDate||'',claimedToday:Number(a.loginBonus?.day)>=21||a.loginBonus?.lastClaimDate===today}}; }
-const GACHA_RARITIES=[{name:'ノーマル',chance:70,titles:['平民の希望','カードの手ほどき','一発逆転の兆し','かけだしのひよっこ','堅実なる手札使い','肉を食べるヴィーガン','お前開示だな']},{name:'ミドル',chance:24,titles:['場を支配する者','革命の扇動者','縛りの技巧派','切り札の潜伏者','おJJスターバックス⁉','チェックといいなさい','学校こい','YBLOVE','だから留年']},{name:'ハイスペック',chance:5,titles:['混沌のカードマスター','運命を決める先行チェック','大富豪の覇者','終焉の8切り','不敗のKING','借金']},{name:'レジェンド',chance:1,titles:['これチェックなんだよなぁ','天地開闢の革命','無慈悲なる大富豪','小林裕也を統べし者','伝説のカードエンペラー','Are you ready?']}];
+const GACHA_RARITIES=[{name:'ノーマル',chance:70,titles:['平民の希望','効力なし！','止め価値～？','ありありありんがー','まじまじマジンガー？','肉を食べるヴィーガン','お前開示だな']},{name:'ミドル',chance:24,titles:['場を支配する者','お前ら甘えてない？','あんまそういうこと言うなよ','Σ','おJJスターバックス⁉','チェックといいなさい','学校こい','YBLOVE','だから留年']},{name:'ハイスペック',chance:5,titles:['佐立を超えるために','運命を決める先行チェック','やぶらぶ','ここでの8切り','不敗のKING','借金']},{name:'レジェンド',chance:1,titles:['これチェックなんだよなぁ','天井天元唯我独尊','くそー動けん','小林裕也を統べし者','伝説の灘エンペラー','Are you ready?']}];
 function drawTitle(){const n=Math.random()*100;let rarity=n<70?GACHA_RARITIES[0]:n<94?GACHA_RARITIES[1]:n<99?GACHA_RARITIES[2]:GACHA_RARITIES[3];return {rarity:rarity.name,title:rarity.titles[Math.floor(Math.random()*rarity.titles.length)]};}
 function authError(message){ return {ok:false,message}; }
 function issueToken(socket,account){ if(!account.welcomeRpClaimed){account.rp=(Number(account.rp)||0)+500;account.welcomeRpClaimed=true;account.welcomeRpClaimedAt=new Date().toISOString();} const token=crypto.randomBytes(32).toString('hex'); account.tokenHash=crypto.createHash('sha256').update(token).digest('hex'); saveAccounts(); socket.data.userId=account.id; sessions.set(token,account.id); attemptReconnect(socket,account); return {ok:true,token,account:safeAccount(account)}; }
@@ -333,7 +333,7 @@ function cpuChoose(p,g){
    if(fours.length>=2&&canBeat(fours.slice(0,2),g))stop=fours.slice(0,2);
    else if(fours.length&&joker&&canBeat([fours[0],joker],g))stop=[fours[0],joker];
    // 4止めを成立可能な場面でも実行率は40%。残り60%はパスする。
-   if(stop&&Math.random()<0.4)return stop;
+   if(stop&&Math.random()<0.3)return stop;
    return [];
  }
  if(!options.length)return [];
@@ -481,6 +481,23 @@ io.on('connection',socket=>{
  });
  socket.on('authResume',(payload={},cb)=>{purgeForbiddenAccounts();const token=String(payload.token||'');if(!/^[a-f0-9]{64}$/.test(token))return cb?.(authError('ログイン情報が無効です。'));const hash=crypto.createHash('sha256').update(token).digest('hex');const a=Object.values(accounts).find(x=>x.tokenHash===hash);if(!a)return cb?.(authError('ログイン情報の期限が切れています。もう一度ログインしてください。'));socket.data.userId=a.id;sessions.set(token,a.id);attemptReconnect(socket,a);cb?.({ok:true,account:safeAccount(a)});});
  socket.on('authLogout',(_payload,cb)=>{const a=accountForSocket(socket);if(a){a.tokenHash=null;saveAccounts();}leaveRoom(socket);socket.data.userId=null;cb?.({ok:true});});
+ socket.on('cpuMatchResult',(payload={},cb)=>{
+  const a=accountForSocket(socket);
+  if(!a)return cb?.({ok:false,message:'CPU戦報酬を受け取るにはログインしてください。'});
+  const firstPlace=payload.firstPlace===true;
+  if(firstPlace){
+   a.cpuWinStreak=(Number(a.cpuWinStreak)||0)+1;
+   let reward=20; let message='CPU戦で1位！ +20 RP';
+   if(a.cpuWinStreak===6){reward+=30;message+='、6連勝ボーナス +30 RP！';}
+   a.rp=(Number(a.rp)||0)+reward;
+   a.cpuWins=(Number(a.cpuWins)||0)+1;
+  }else{
+   a.cpuWinStreak=0;
+   return saveAccounts(),cb?.({ok:true,account:safeAccount(a),message:'CPU戦お疲れさまでした。連勝記録はリセットされました。'});
+  }
+  saveAccounts();
+  cb?.({ok:true,account:safeAccount(a),message});
+ });
  socket.on('rollTitleGacha',(payload={},cb)=>{const a=accountForSocket(socket);if(!a)return cb?.(authError('ガチャを回すにはログインしてください。'));const count=Number(payload.count);if(count!==1&&count!==10)return cb?.({ok:false,message:'1連または10連を選択してください。'});const cost=count===1?200:900;if((a.rp||0)<cost)return cb?.({ok:false,message:`RPが足りません（必要：${cost} RP）。`});a.rp=(a.rp||0)-cost;if(!Array.isArray(a.ownedTitles))a.ownedTitles=[];const results=[];for(let i=0;i<count;i++){const draw=drawTitle(),duplicate=a.ownedTitles.includes(draw.title);if(!duplicate)a.ownedTitles.push(draw.title);results.push({...draw,duplicate});}saveAccounts();cb?.({ok:true,spent:cost,results,account:safeAccount(a)});});
  socket.on('setSelectedTitle',(payload={},cb)=>{const a=accountForSocket(socket);if(!a)return cb?.(authError('称号を設定するにはログインしてください。'));const title=String(payload.title||'');if(title&&!(Array.isArray(a.ownedTitles)&&a.ownedTitles.includes(title)))return cb?.({ok:false,message:'その称号は所持していません。ガチャで獲得してください。'});a.selectedTitle=title;for(const [code,room] of rooms.entries()){let changed=false;for(const p of room.players){if(p.userId===a.id){p.title=title;changed=true;}}if(room.game){for(const gp of room.game.players){if(gp.userId===a.id){gp.title=title;changed=true;}}}if(changed){broadcastLobby(code);if(room.game)emitGame(code);}}saveAccounts();cb?.({ok:true,account:safeAccount(a)});});
  socket.on('claimLoginBonus',(_payload,cb)=>{const a=accountForSocket(socket);if(!a)return cb?.(authError('ログインボーナスを受け取るにはログインしてください。'));const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});if(!a.loginBonus)a.loginBonus={day:0,lastClaimDate:''};const b=a.loginBonus;if(Number(b.day)>=21)return cb?.({ok:false,message:'21日間のログインボーナスはすべて達成済みです。',account:safeAccount(a)});if(b.lastClaimDate===today)return cb?.({ok:false,message:'今日の報酬は受取済みです。',account:safeAccount(a)});const yesterday=new Date(Date.now()-86400000).toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});b.day=b.lastClaimDate===yesterday?Math.min(21,(Number(b.day)||0)+1):1;b.lastClaimDate=today;const day=b.day;const titleRewards={1:'初ログイン',2:'常連',3:'大富豪見習い',4:'カードコレクター',5:'毎日革命',6:'継続中',8:'革命の予感',9:'カードマスター',10:'大富豪研究家',11:'伝説の始まり',12:'ジョーカーコレクター',13:'革命の支配者',15:'皆勤への道',16:'大富豪の極意',17:'上がりの達人',18:'勝負師',19:'称号マニア',20:'最後の試練'};const effectRewards={7:'CLEAN_FINISH',14:'GOLDEN_SEVEN',21:'MYSTIC_JOKER'};let message=`${day}日目の報酬を受け取りました。`;if(titleRewards[day]){if(!Array.isArray(a.ownedTitles))a.ownedTitles=[];if(!a.ownedTitles.includes(titleRewards[day]))a.ownedTitles.push(titleRewards[day]);message+=` 称号「${titleRewards[day]}」を獲得！`;}if(effectRewards[day]){if(!Array.isArray(a.unlockedEffects))a.unlockedEffects=[];if(!a.unlockedEffects.includes(effectRewards[day]))a.unlockedEffects.push(effectRewards[day]);message+=` エフェクト「${effectRewards[day]}」を解放！`;}saveAccounts();cb?.({ok:true,message,account:safeAccount(a)});});
