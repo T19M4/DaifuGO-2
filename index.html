@@ -83,6 +83,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .q-modal{z-index:1000}
 .give-modal{z-index:1100;display:none;align-items:center;justify-content:center;padding:14px;background:#001a16dd}
 .give-modal.open{display:flex}
+.down-choice-modal{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;padding:14px;background:#001a16e8}.down-choice-modal.open{display:flex}.down-choice-box{width:min(420px,100%);background:#07382e;border:2px solid #ffd85a;border-radius:16px;padding:18px;box-shadow:0 12px 40px #0009;text-align:center}.down-choice-box p{color:#d7eeee;line-height:1.5}.down-choice-actions{display:grid;grid-template-columns:1fr;gap:9px;margin-top:14px}
 .give-box{width:min(760px,100%);max-height:92vh;overflow:auto;background:#07382e;border:2px solid #ffd85a;border-radius:16px;padding:18px;box-shadow:0 12px 40px #0009}
 .give-cards{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:14px 0}
 .give-cards .card{cursor:pointer}
@@ -373,6 +374,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </div>
 </div>
 
+<div class="down-choice-modal" id="downChoiceModal" role="dialog" aria-modal="true" aria-labelledby="downChoiceTitle">
+<div class="down-choice-box">
+<h2 id="downChoiceTitle">ダウンナンバーの選択</h2>
+<p id="downChoiceHelp">ダウンナンバーとして出すか、通常ルールで出すか選択してください。</p>
+<div class="down-choice-actions"><button type="button" id="chooseDownNumberBtn">ダウンナンバーで出す</button><button type="button" id="chooseNormalPlayBtn">通常通り出す</button><button type="button" id="cancelDownChoiceBtn" style="background:#244753">戻る</button></div>
+</div></div>
+
 <div class="q-modal" id="qModal" role="dialog" aria-modal="true" aria-labelledby="qTitle">
 <div class="q-box">
 <h2 id="qTitle">Qボンバー：破壊する数字を宣言</h2>
@@ -474,6 +482,7 @@ let pendingGive=null;
 let pendingReceivedCard=null;
 let pendingDiscard=null;
 let state;
+let pendingDownChoiceCards=null;
 
 const suitColor=s=>s==='♥'||s==='♦'?'red':'';
 const rankPower=r=>{
@@ -520,6 +529,7 @@ function shuffled(a){
 }
 
 function newGame(){
+ closeDownChoice();
  pendingGive=null;
  pendingReceivedCard=null;
  pendingDiscard=null;
@@ -735,7 +745,7 @@ function validSet(cards){
  return stairRanks(cards)!==null;
 }
 
-function canBeat(cards){
+function canBeat(cards,ignoreDownNumber=false){
  if(!validSet(cards))return false;
  if(state.stairLock==='stair' && stairRanks(cards)===null)return false;
  if(state.stairLock==='stairRevolution' && !(stairRanks(cards)!==null && cards.length>=4))return false;
@@ -764,7 +774,7 @@ function canBeat(cards){
  if(state.lockSuit&&!cards.some(c=>c.rank===16)&&cards.some(c=>c.suit!==state.lockSuit))return false;
 
  // ダウンナンバー中はJバックの状態に関係なく、同じスートの前後1つの数字を出せる。
- if(state.downNumberBaseRank!==null){
+ if(state.downNumberBaseRank!==null&&!ignoreDownNumber){
   if(cards.length!==1 || cards[0].rank===16 || state.table.length!==1 || state.table[0].rank===16)return false;
   const sameSuit=cards[0].suit===state.table[0].suit;
   const canContinueAdjacent=sameSuit && Math.abs(cards[0].rank-state.table[0].rank)===1;
@@ -773,7 +783,7 @@ function canBeat(cards){
 
  // 場にカードが1枚だけあるとき、同じマークで1つ下のカードを出せる。
  // 場が空のときは上の処理で終了するため、ダウンナンバーは発動しない。
- if(state.table.length===1 && cards.length===1 &&
+ if(!ignoreDownNumber && state.table.length===1 && cards.length===1 &&
     cards[0].rank!==16 && state.table[0].rank!==16 &&
     cards[0].suit===state.table[0].suit &&
     Math.abs(cards[0].rank-state.table[0].rank)===1){
@@ -879,22 +889,43 @@ function finishIfNeeded(p){
   state.finishOrder.push(p.name);
   log(p.name+'が'+p.place+'位で'+offlinePlaceLabel(p));
 
-  if(state.players.filter(x=>!x.finished).length<=1){
+  // オフライン戦は「あなた」が上がった時点で即終了する。CPU同士の続行はしない。
+  if(p===state.players[0] || state.players.filter(x=>!x.finished).length<=1){
    state.finished=true;
-   let loser=state.players.find(x=>!x.finished);
-   if(loser){loser.place=state.players.length-state.players.filter(x=>x.forfeited).length;loser.finished=true;log('最後まで残った'+loser.name+'は'+loser.place+'位：'+offlinePlaceLabel(loser));}
-   state.players.forEach(x=>{if(!x.place)x.place=state.players.length;});
+   const unfinished=state.players.filter(x=>!x.finished).sort((a,b)=>state.players.indexOf(a)-state.players.indexOf(b));
+   let nextPlace=Math.max(0,...state.players.filter(x=>x.finished&&!unfinished.includes(x)).map(x=>Number(x.place)||0))+1;
+   unfinished.forEach(x=>{x.finished=true;x.hand=[];x.place=nextPlace++;});
+   state.players.forEach(x=>{if(!x.place)x.place=nextPlace++;});
    state.finishOrder=state.players.slice().sort((a,b)=>(a.place||state.players.length)-(b.place||state.players.length)).map(x=>x.name+'（'+x.place+'位・'+offlinePlaceLabel(x)+'）');
    log('ゲーム終了：'+state.finishOrder.join(' → '));
-   // CPU戦の結果をログイン中のアカウントへ反映。1位なら20RP、6連勝到達時は追加30RP。
-   if(!state.cpuRewardSent){state.cpuRewardSent=true;if(onlineSocket&&onlineAccount){onlineSocket.emit('cpuMatchResult',{firstPlace:state.players[0].place===1},result=>{if(result?.ok&&result.account){onlineAccount=result.account;renderAccountStatus();render();showOnlineEffectToast(result.message||'CPU戦報酬を受け取りました。');log(result.message||'CPU戦報酬を受け取りました。');}});}}
+   // 「あなた」が1位なら+20RP。6連勝・10連勝の追加報酬はサーバー側で計算する。
+   if(!state.cpuRewardSent){state.cpuRewardSent=true;if(onlineSocket&&onlineAccount){onlineSocket.emit('cpuMatchResult',{firstPlace:state.players[0].place===1},result=>{if(result?.ok&&result.account){onlineAccount=result.account;renderAccountStatus();render();const popup=result.account.cpuWinStreak>0&&state.players[0].place===1?`＋20 RP${result.message.includes('6連勝ボーナス')?' ＋30 RP':''}${result.message.includes('ガチャチケット')?' ＋ガチャチケット1枚':''}`:result.message;showOnlineEffectToast(popup||result.message||'CPU戦報酬を受け取りました。');log(result.message||'CPU戦報酬を受け取りました。');}});}}
    return true;
   }
  }
  return false;
 }
 
-function playCards(cards,byCpu=false){
+function isDownNumberCandidate(cards){
+ return !!(cards&&cards.length===1&&state.table.length===1&&cards[0].rank!==16&&state.table[0].rank!==16&&cards[0].suit===state.table[0].suit&&Math.abs(cards[0].rank-state.table[0].rank)===1);
+}
+function openDownChoice(cards){
+ pendingDownChoiceCards=cards.slice();
+ const modal=document.getElementById('downChoiceModal');
+ const downBtn=document.getElementById('chooseDownNumberBtn');
+ const eligible=isDownNumberCandidate(cards);
+ downBtn.disabled=!eligible;
+ document.getElementById('downChoiceHelp').textContent=eligible
+  ? '同じスートの前後1つの数字です。ダウンナンバーとして出すか、通常ルールで出すか選択してください。'
+  : '現在はダウンナンバーの効果中です。通常ルールで出すか、手札選択に戻ってください。';
+ modal.classList.add('open');
+}
+function closeDownChoice(){document.getElementById('downChoiceModal').classList.remove('open');pendingDownChoiceCards=null;}
+document.getElementById('chooseDownNumberBtn').addEventListener('click',()=>{const cards=pendingDownChoiceCards?.slice();if(!cards)return;closeDownChoice();playCards(cards,false,true);});
+document.getElementById('chooseNormalPlayBtn').addEventListener('click',()=>{const cards=pendingDownChoiceCards?.slice();if(!cards)return;closeDownChoice();playCards(cards,false,false);});
+document.getElementById('cancelDownChoiceBtn').addEventListener('click',closeDownChoice);
+
+function playCards(cards,byCpu=false,downNumberChoice=null){
  let p=current();
  if(state.pendingQ)return false;
 
@@ -905,7 +936,14 @@ function playCards(cards,byCpu=false){
   }
  }
 
- if(!cards.length||!canBeat(cards)){
+ if(!cards.length)return false;
+ const downCandidate=isDownNumberCandidate(cards);
+ // ダウンナンバーが可能な場面では、プレイヤーが「ダウンナンバー」か「通常ルール」を選ぶ。
+ if(!byCpu&&downNumberChoice===null&&(downCandidate||state.downNumberBaseRank!==null)){
+  openDownChoice(cards);return false;
+ }
+ if(downNumberChoice===true&&!downCandidate){alert('このカードではダウンナンバーできません。');return false;}
+ if(!canBeat(cards,downNumberChoice===false)){
   if(!byCpu)alert('そのカードは出せません。枚数・階段・場の強さを確認してください。');
   return false;
  }
@@ -924,10 +962,7 @@ function playCards(cards,byCpu=false){
  const oldLockSuit=state.lockSuit;
  const wasTableOccupied=state.table.length>0;
  const qToJBack=state.table.length===1 && cards.length===1 && state.table[0].rank===12 && cards[0].rank===11 && cards[0].suit===state.table[0].suit;
- const downNumberPlay=!qToJBack && state.table.length===1 && cards.length===1 &&
-  cards[0].rank!==16 && state.table[0].rank!==16 &&
-  cards[0].suit===state.table[0].suit &&
-  Math.abs(cards[0].rank-state.table[0].rank)===1;
+ const downNumberPlay=!qToJBack && isDownNumberCandidate(cards) && (byCpu ? true : downNumberChoice===true);
  const previousDownNumberBase=state.downNumberBaseRank;
 
  removeCards(p,cards);
@@ -936,6 +971,7 @@ function playCards(cards,byCpu=false){
  state.stairLock=selectedStairRanks?(cards.length>=4?'stairRevolution':'stair'):null;
  // ダウンナンバーは同じスートの前後1つの数字で連続できる。
  // ダウンナンバー以外のカードが出たら通常の比較に戻す。
+ // ダウンナンバーは選択した場合のみ次の返しに有効。通常プレイを選んだら効果を解除する。
  state.downNumberBaseRank=downNumberPlay ? (previousDownNumberBase!==null ? previousDownNumberBase : oldTable[0].rank) : null;
  state.lastCards=cards.slice();
  state.lastPlayMode={revolution:state.revolution,jBack:state.jBack};
