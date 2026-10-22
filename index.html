@@ -1786,8 +1786,21 @@ function onlineRequest(eventName,payload){
 }
 function renderAccountStatus(message=''){
  const status=document.getElementById('accountStatus'),rank=document.getElementById('accountRankView');
- if(onlineAccount){status.textContent='ログイン中（アカウント情報は非表示）';rank.textContent=`RP：${onlineAccount.rp||0} ／ 🎟️ ${onlineAccount.gachaTickets||0}枚 ／ CPU連勝 ${onlineAccount.cpuWinStreak||0} ／ 対戦 ${onlineAccount.games||0}回 ／ 優勝 ${onlineAccount.wins||0}回`;document.getElementById('logoutAccountBtn').style.display='inline-block';document.getElementById('googleLinkBtn').style.display=onlineAccount?'inline-block':'none';}
- else{status.textContent=message||'未ログイン';rank.textContent='';document.getElementById('logoutAccountBtn').style.display='none';document.getElementById('googleLinkBtn').style.display='none';}
+ const googleLogin=document.getElementById('googleLoginRender');
+ const googleLink=document.getElementById('googleLinkBtn');
+ if(onlineAccount){
+  // ログイン後はGoogleのサインインボタンを隠し、アカウント選択情報やメールアドレスが画面に残らないようにする。
+  status.textContent='ログイン中（Googleアカウント情報は非表示）';
+  rank.textContent=`RP：${onlineAccount.rp||0} ／ 🎟️ ${onlineAccount.gachaTickets||0}枚 ／ CPU連勝 ${onlineAccount.cpuWinStreak||0} ／ 対戦 ${onlineAccount.games||0}回 ／ 優勝 ${onlineAccount.wins||0}回`;
+  document.getElementById('logoutAccountBtn').style.display='inline-block';
+  if(googleLogin)googleLogin.style.display='none';
+  if(googleLink)googleLink.style.display='none';
+ } else {
+  status.textContent=message||'未ログイン';rank.textContent='';
+  document.getElementById('logoutAccountBtn').style.display='none';
+  if(googleLogin)googleLogin.style.display='';
+  if(googleLink)googleLink.style.display='none';
+ }
  if(document.getElementById('gachaRpView'))updateGachaProfileViews();if(document.getElementById('loginBonusModal')?.classList.contains('open'))renderLoginBonus();
 }
 function authRequest(eventName){if(eventName==='authRegister'){const username=document.getElementById('accountUsername').value.trim();if(forbiddenOnlineName(username)){document.getElementById('accountStatus').textContent='このユーザー名は使用できません。禁止ワードが含まれています。';return;}}if(!onlineSocket){openOnlineModal();}if(!onlineSocket||!onlineSocket.connected){document.getElementById('accountStatus').textContent='サーバーに接続してから操作してください。';return;}const username=document.getElementById('accountUsername').value.trim(),password=document.getElementById('accountPassword').value;onlineSocket.emit(eventName,{username,password},result=>{if(!result?.ok){document.getElementById('accountStatus').textContent=result?.message||'認証に失敗しました。';return;}onlineAuthToken=result.token;onlineAccount=result.account;localStorage.setItem('daifugo2_auth_token',onlineAuthToken);document.getElementById('accountPassword').value='';renderAccountStatus();});}
