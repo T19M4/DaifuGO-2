@@ -332,7 +332,7 @@ function cpuChoose(p,g){
    let stop=null;
    if(fours.length>=2&&canBeat(fours.slice(0,2),g))stop=fours.slice(0,2);
    else if(fours.length&&joker&&canBeat([fours[0],joker],g))stop=[fours[0],joker];
-   // 4止めを成立可能な場面でも実行率は40%。残り60%はパスする。
+   // 4止めを成立可能な場面でも実行率は30%。残り70%はパスする。
    if(stop&&Math.random()<0.3)return stop;
    return [];
  }
