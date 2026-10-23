@@ -1043,10 +1043,14 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
   // 特殊効果は、実際に出した数字ごとに個別判定する。
   // 階段では選択順で決まったジョーカーの代用数字も効果対象にする。
   // ペア等ではジョーカーは同じ数字の不足分としてのみ数える。
-  const jokerSubCount=cards.some(c=>c.rank===16)&&cards.some(c=>c.rank!==16)?1:0;
-  const resolvedEffectRanks=selectedStairRanks ? selectedStairRanks.slice() : cards.filter(c=>c.rank!==16).map(c=>c.rank);
-  if(!selectedStairRanks&&jokerSubCount&&cards.filter(c=>c.rank!==16).every(c=>c.rank===cards.find(x=>x.rank!==16)?.rank)){
-   resolvedEffectRanks.push(cards.find(c=>c.rank!==16).rank);
+  const normalCardsForEffects=cards.filter(c=>c.rank!==16);
+  const jokerCountForEffects=cards.filter(c=>c.rank===16).length;
+  const resolvedEffectRanks=selectedStairRanks ? selectedStairRanks.slice() : normalCardsForEffects.map(c=>c.rank);
+  // 階段でない組み合わせでは、ジョーカーは同じ組の数字をコピーする。
+  // 例：10・10・ジョーカーなら、ジョーカーも10扱いになり10捨ては3枚分。
+  // 異なる数字が混在する場合はコピー先を推測せず、効果を追加しない。
+  if(!selectedStairRanks&&jokerCountForEffects>0&&normalCardsForEffects.length>0&&normalCardsForEffects.every(c=>c.rank===normalCardsForEffects[0].rank)){
+   for(let i=0;i<jokerCountForEffects;i++)resolvedEffectRanks.push(normalCardsForEffects[0].rank);
   }
   const effectCount=(rank)=>resolvedEffectRanks.filter(r=>r===rank).length;
 
