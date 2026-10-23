@@ -336,7 +336,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <thead><tr><th>効果</th><th>説明</th></tr></thead>
 <tbody>
 <tr><td>♠3返し</td><td>ジョーカーに対してスペードの3を出せる</td></tr>
-<tr><td>4止め</td><td>場に8があるとき、4のペアまたは4とジョーカーのペアで場を流し、自分から再開</td></tr>
+<tr><td>4止め</td><td>場に8があり、場に9がないとき、4のペアまたは4とジョーカーのペアで場を流し、自分から再開</td></tr>
 <tr><td>5スキップ</td><td>次のプレイヤーを飛ばす</td></tr>
 <tr><td>7渡し</td><td>手札から渡すカードを1枚選び、次のプレイヤーに渡す。CPUもカードを選んで渡す</td></tr>
 <tr><td>8切り</td><td>他のプレイヤーが4を2枚、または4とジョーカーを出して4止めしない限り、全員のパス後に場を流して8を出した人から再開</td></tr>
@@ -347,7 +347,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <tr><td>ダウンナンバー</td><td>場が1枚のとき、同じスートの前後1つの数字を出せる。例：♠4には♠3または♠5。ダウンナンバー中も場の数字の前後1つを出せる。場が空なら発動しない</td></tr>
 <tr><td>縛り</td><td>場にカードがある状態で、同じマークで続けて出した場合に発生</td></tr>
 <tr><td>階段</td><td>同じマークの連続した数字をまとめて出せる。ジョーカー1～2枚で連番の欠けを補える</td></tr>
-<tr><td>ジョーカー</td><td>場のカードが1枚なら条件を問わず出せる。ペア・革命・階段の不足分にも1～2枚使える</td></tr>
+<tr><td>ジョーカー</td><td>ペア・革命・階段の不足分に使える。階段では選択した順番の欠けた数字を担当し、その数字の特殊効果が発動する（例：6・7・ジョーカーならジョーカーは8扱い）</td></tr>
 <tr><td>禁止上がり</td><td>2・ジョーカーなど禁止カードで上がると反則</td></tr>
 <tr><td>都落ち</td><td>この版では未実装</td></tr>
 </tbody>
@@ -555,7 +555,7 @@ function newGame(){
  state={
   players,turn:start,deck:[],table:[],trickCards:[],lastCards:[],lastPlayer:-1,
   passCount:0,selected:new Set(),stairLock:null,jBack:false,jBackNineLock:false,revolution:false,neutralizeNext:false,neutralizeCount:0,lockSuit:null,effects:[],
-  finished:false,finishOrder:[],pendingQ:false,turnSerial:0,cpuRewardSent:false,
+  finished:false,finishOrder:[],pendingQ:false,pendingQUsedRanks:[],turnSerial:0,cpuRewardSent:false,
   firstMove:true,eightCutPending:false,pendingDiscardCount:0,downNumberBaseRank:null
  };
 
@@ -760,7 +760,7 @@ function canBeat(cards,ignoreDownNumber=false){
 
  // 8切り待機中は、他プレイヤーが出せるのは4の2枚、または4＋ジョーカーだけ。
  // それ以外のカードで8切りを上書きすることはできない。
- if(state.eightCutPending&&state.table.some(c=>c.rank===8))return isFourStopPair(cards);
+ if(state.eightCutPending&&state.table.some(c=>c.rank===8))return !state.table.some(c=>c.rank===9)&&isFourStopPair(cards);
 
  if(cards.length!==state.table.length)return false;
  const playedStair=stairRanks(cards),tableStair=stairRanks(state.table);
@@ -950,7 +950,7 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
  const selectedStairRanks=stairRanks(cards);
 
  const wasFirstMove=state.firstMove;
- const fourStop=state.eightCutPending&&state.table.some(c=>c.rank===8)&&isFourStopPair(cards);
+ const fourStop=state.eightCutPending&&state.table.some(c=>c.rank===8)&&!state.table.some(c=>c.rank===9)&&isFourStopPair(cards);
  const spadeThreeReversal=!state.jBackNineLock&&state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠';
  const oldTable=state.table.slice();
 
@@ -1020,10 +1020,15 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
  if(suppressEffects)log(state.jBackNineLock?'Jバック＋9の封印により、このカードの特殊効果は無効':'9の効果により、このカードの能力は無効');
 
  if(!suppressEffects){
+  // 特殊効果は、実際に出した数字ごとに個別判定する。
+  // 階段では選択順で決まったジョーカーの代用数字も効果対象にする。
+  // ペア等ではジョーカーは同じ数字の不足分としてのみ数える。
   const jokerSubCount=cards.some(c=>c.rank===16)&&cards.some(c=>c.rank!==16)?1:0;
-  const effectCount=(rank)=>selectedStairRanks
-   ? selectedStairRanks.filter(r=>r===rank).length
-   : cards.filter(c=>c.rank===rank).length+(jokerSubCount&&cards.some(c=>c.rank===rank)?1:0);
+  const resolvedEffectRanks=selectedStairRanks ? selectedStairRanks.slice() : cards.filter(c=>c.rank!==16).map(c=>c.rank);
+  if(!selectedStairRanks&&jokerSubCount&&cards.filter(c=>c.rank!==16).every(c=>c.rank===cards.find(x=>x.rank!==16)?.rank)){
+   resolvedEffectRanks.push(cards.find(c=>c.rank!==16).rank);
+  }
+  const effectCount=(rank)=>resolvedEffectRanks.filter(r=>r===rank).length;
 
   const fiveCount=effectCount(5);
   if(fiveCount){
@@ -1051,7 +1056,7 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
    log('9の効果：次の'+effectCount(9)+'回、出されたカードの能力を無効化（Jバック・縛りは継続）');
   }
 
-  if(cards.some(c=>c.rank===10)){
+  if(effectCount(10)>0){
    const n=effectCount(10);
    state.effects.push('10捨て（'+n+'枚）');
    state.pendingDiscardCount=n;
@@ -1076,21 +1081,22 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
    state.revolution=!state.revolution;
    state.effects.push(state.revolution?'革命':'革命返し');
    log(state.revolution?'革命！カードの強さが逆転':'革命返し！カードの強さが通常に戻る');
+   if(jokerCount>0)log('ジョーカーを含む革命：ジョーカー込みの革命演出を開始します。');
    showRevolutionAnimation(state.revolution);
   }
 
   if(effectCount(12)>0){
    state.effects.push('Qボンバー');
    state.pendingQ=true;
-   state.pendingQRemaining=cards.filter(c=>c.rank===12).length+(cards.some(c=>c.rank===16)&&cards.some(c=>c.rank===12)?1:0);
+   state.pendingQUsedRanks=[];
+   state.pendingQRemaining=effectCount(12);
    state.pendingQActor=state.turn;
    render();
    document.getElementById('notice').textContent='Qボンバー：破壊する数字を必ず宣言してください（残り'+state.pendingQRemaining+'回）';
 
    if(byCpu){
-    const rank=CPU_Q_RANKS[Math.floor(Math.random()*CPU_Q_RANKS.length)];
-    log(p.name+'のQボンバー宣言：'+rankName(rank));
-    applyQ(rank,p);
+    const rank=nextUnusedQRank();
+    if(rank!==null){log(p.name+'のQボンバー宣言：'+rankName(rank));applyQ(rank,p);}
    }else{
     openQModal();
    }
@@ -1139,7 +1145,7 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
  }
 
  // 7渡し：出した7の枚数分、カードを渡す。CPUも同じ枚数だけ実行する。
- const giveCount=cards.filter(c=>c.rank===7).length+(cards.some(c=>c.rank===16)&&cards.some(c=>c.rank===7)?1:0);
+ const giveCount=selectedStairRanks ? selectedStairRanks.filter(r=>r===7).length : (cards.filter(c=>c.rank===7).length+(cards.some(c=>c.rank===16)&&cards.some(c=>c.rank!==16)&&cards.filter(c=>c.rank!==16).every(c=>c.rank===cards.find(x=>x.rank!==16)?.rank)&&cards.some(c=>c.rank===7)?1:0));
  if(giveCount>0&&p.hand.length){
   if(byCpu){
    let remaining=giveCount;
@@ -1361,6 +1367,12 @@ document.getElementById('receiveCardBtn').addEventListener('click',()=>{
  }
 });
 
+function nextUnusedQRank(){
+ const used=new Set(state?.pendingQUsedRanks||[]);
+ const available=[...RANKS,16].filter(rank=>!used.has(rank));
+ return available.length?available[Math.floor(Math.random()*available.length)]:null;
+}
+
 function openQModal(){
  qSelectedRank=null;
  const modal=document.getElementById('qModal');
@@ -1372,7 +1384,8 @@ function openQModal(){
  preview.classList.remove('open');
  document.getElementById('qHandToggle').textContent='自分の手札を見る';
 
- const ranks=[...RANKS,16];
+ const usedRanks=new Set(state?.pendingQUsedRanks||[]);
+ const ranks=[...RANKS,16].filter(rank=>!usedRanks.has(rank));
  ranks.forEach(rank=>{
   const b=document.createElement('button');
   b.type='button';
@@ -1410,6 +1423,14 @@ function applyQ(rank,p){
   log('Qボンバーの数字指定が無効です');
   return;
  }
+ if(!Array.isArray(state.pendingQUsedRanks))state.pendingQUsedRanks=[];
+ if(state.pendingQUsedRanks.includes(rank)){
+  log('Qボンバー：すでに指定した数字は選べません。別の数字を選んでください。');
+  if(p?.human)openQModal();
+  else {const nextRank=nextUnusedQRank();if(nextRank!==null)applyQ(nextRank,p);}
+  return;
+ }
+ state.pendingQUsedRanks.push(rank);
 
  // 破壊するカードを先に集め、中央に表示してから手札から取り除く。
  const destroyedCards=[];
@@ -1460,9 +1481,8 @@ function applyQ(rank,p){
    if(p.human){
     openQModal();
    }else{
-    const nextRank=CPU_Q_RANKS[Math.floor(Math.random()*CPU_Q_RANKS.length)];
-    log(p.name+'のQボンバー宣言：'+rankName(nextRank));
-    applyQ(nextRank,p);
+    const nextRank=nextUnusedQRank();
+    if(nextRank!==null){log(p.name+'のQボンバー宣言：'+rankName(nextRank));applyQ(nextRank,p);}
    }
    return;
   }
@@ -1757,18 +1777,21 @@ let lastOnlineQBombSerial = 0;
 let lastOnlineSpade3Serial = 0;
 let lastOnlineJBackValue = false;
 let lastOnlineRevolutionValue = false;
+function ensureOnlineSocket(){
+ if(onlineSocket)return onlineSocket;
+ if(typeof io!=='function')return null;
+ onlineSocket=io(ONLINE_SERVER_URL,{transports:['websocket','polling']});
+ onlineSocket.on('connect',()=>{if(onlineAuthToken)onlineSocket.emit('authResume',{token:onlineAuthToken},result=>{if(result?.ok){onlineAccount=result.account;renderAccountStatus();}else{onlineAuthToken='';localStorage.removeItem('daifugo2_auth_token');onlineAccount=null;renderAccountStatus(result?.message||'再ログインしてください。');}});});
+ onlineSocket.on('connect_error',()=>{const err=document.getElementById('onlineError');if(err)err.textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
+ onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
+ onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}if((data.jBackSerial||0)>lastOnlineJBackSerial){lastOnlineJBackSerial=data.jBackSerial;showJJBubble();}if((data.revolutionSerial||0)>lastOnlineRevolutionSerial){lastOnlineRevolutionSerial=data.revolutionSerial;showRevolutionAnimation(!!data.revolution);}if((data.qBombSerial||0)>lastOnlineQBombSerial){lastOnlineQBombSerial=data.qBombSerial;showOnlineEffectToast('Qボンバー！ '+onlineRankName(data.qBombEvent?.rank));}if((data.spade3Serial||0)>lastOnlineSpade3Serial){lastOnlineSpade3Serial=data.spade3Serial;showSpade3Animation();}});
+ onlineSocket.on('onlineActionError',msg=>{document.getElementById('onlineGameStatus').textContent=msg;});
+ onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。';resetOnlineLobby();});
+ return onlineSocket;
+}
 function openOnlineModal(){
  const modal=document.getElementById('onlineModal');modal.classList.add('open');document.getElementById('onlineError').textContent='';
- if(!onlineSocket){
-  if(typeof io!=='function'){document.getElementById('onlineError').textContent='通信ライブラリを読み込めません。Renderのサーバーを確認してください。';return;}
-  onlineSocket=io(ONLINE_SERVER_URL,{transports:['websocket','polling']});
-  onlineSocket.on('connect',()=>{if(onlineAuthToken)onlineSocket.emit('authResume',{token:onlineAuthToken},result=>{if(result?.ok){onlineAccount=result.account;renderAccountStatus();}else{onlineAuthToken='';localStorage.removeItem('daifugo2_auth_token');onlineAccount=null;renderAccountStatus(result?.message||'再ログインしてください。');}});});
-  onlineSocket.on('connect_error',()=>{document.getElementById('onlineError').textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
-  onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
-  onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}if((data.jBackSerial||0)>lastOnlineJBackSerial){lastOnlineJBackSerial=data.jBackSerial;showJJBubble();}if((data.revolutionSerial||0)>lastOnlineRevolutionSerial){lastOnlineRevolutionSerial=data.revolutionSerial;showRevolutionAnimation(!!data.revolution);}if((data.qBombSerial||0)>lastOnlineQBombSerial){lastOnlineQBombSerial=data.qBombSerial;showOnlineEffectToast('Qボンバー！ '+onlineRankName(data.qBombEvent?.rank));}if((data.spade3Serial||0)>lastOnlineSpade3Serial){lastOnlineSpade3Serial=data.spade3Serial;showSpade3Animation();}});
-  onlineSocket.on('onlineActionError',msg=>{document.getElementById('onlineGameStatus').textContent=msg;});
-  onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。';resetOnlineLobby();});
- }
+ if(!ensureOnlineSocket())document.getElementById('onlineError').textContent='通信ライブラリを読み込めません。Renderのサーバーを確認してください。';
 }
 function renderOnlinePlayers(players){
  const list=document.getElementById('onlinePlayers');list.innerHTML='';
@@ -1892,6 +1915,7 @@ document.getElementById('onlineExitGameBtn').addEventListener('click',()=>docume
 document.getElementById('onlineNewGameBtn').addEventListener('click',()=>{if(!onlineIsHost||!onlineSocket||!onlineSocket.connected)return;const btn=document.getElementById('onlineNewGameBtn');btn.disabled=true;onlineSocket.emit('startOnlineGame',{},result=>{btn.disabled=false;if(!result?.ok)document.getElementById('onlineGameStatus').textContent=result?.message||'ニューゲームを開始できません。';});});
 document.getElementById('onlineShowFieldCards').addEventListener('click',()=>{if(!onlineGameData)return;const box=document.getElementById('fieldPopupCards');box.innerHTML='';const history=onlineGameData.trickHistory||[];if(!history.length){box.textContent='この場で出されたカードはまだありません。';}else{history.forEach(entry=>{const row=document.createElement('div');row.style.width='100%';row.style.marginBottom='12px';const label=document.createElement('div');label.style.fontWeight='800';label.style.marginBottom='6px';label.textContent=entry.player+'：';row.append(label);const cardsRow=document.createElement('div');cardsRow.style.display='flex';cardsRow.style.flexWrap='wrap';cardsRow.style.gap='5px';(entry.cards||[]).forEach(c=>cardsRow.append(cardEl(c)));row.append(cardsRow);box.append(row);});}document.getElementById('fieldModal').classList.add('open');});
 
+ensureOnlineSocket(); // オフライン戦のRP報酬にもログイン済みアカウントを使えるよう、起動時に接続して認証を復元する
 newGame();
 </script>
 
