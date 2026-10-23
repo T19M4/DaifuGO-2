@@ -633,11 +633,8 @@ function activeNames(){
 }
 
 function offlinePlaceLabel(player){
- const n=state.players.length,place=player.place||n;
- if(n===2)return place===1?'上がり！':'負け';
- if(n===3)return place<=2?'上がり！':'3位';
- if(n===4)return place<=2?'上がり！':place===3?'貧民':'大貧民';
- if(n===5)return place<=2?'上がり！':place===3?'3位':place===4?'貧民':'大貧民';
+ // オフラインCPU戦では「上がり！」や「貧民」ではなく、全員を順位で統一表示する。
+ const place=Number(player.place)||state.players.length;
  return `${place}位`;
 }
 
@@ -653,7 +650,7 @@ function render(){
  state.players.forEach((p,i)=>{
   let d=document.createElement('div');
   d.className='player'+(i===state.turn&&!state.finished?' active':'');
-  const playerStatus=p.status|| (state.finished&&p.place?offlinePlaceLabel(p):p.finished?offlinePlaceLabel(p):'残り '+p.hand.length+' 枚');
+  const playerStatus=(state.finished||p.finished||p.place)?offlinePlaceLabel(p):(p.status||'残り '+p.hand.length+' 枚');
   const streakLine=i===0?`<div style="font-size:12px;color:#ffe58b">連勝：${Number(onlineAccount?.cpuWinStreak)||0}</div>`:'';
   d.innerHTML=`<b>${p.name}</b>${streakLine}<div>${playerStatus}</div><div class="cards-back">${p.human?'':'▰ '.repeat(Math.min(p.hand.length,7))}</div>`;
   ps.append(d);
