@@ -104,6 +104,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .q-help{color:#d7eeee;font-size:13px}
 .q-bomb-card{animation:qBombPop 1.1s ease both;outline:3px solid #ffd85a;box-shadow:0 0 22px #ffcf33}
 .q-bomb-show{background:radial-gradient(circle,#7a2020aa,transparent 72%);border-radius:14px}
+.q-bomb-result-bubble{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.45) rotate(-5deg);opacity:0;pointer-events:none;z-index:6000;min-width:min(300px,calc(100vw - 32px));max-width:calc(100vw - 32px);box-sizing:border-box;background:radial-gradient(circle at top,#ffef9b,#ffb52e 58%,#e84a19);color:#65120c;border:4px solid #fff5bc;border-radius:24px;padding:22px 26px;text-align:center;font-size:clamp(24px,5vw,44px);font-weight:1000;line-height:1.25;white-space:normal;text-shadow:0 1px #fff8;box-shadow:0 0 0 7px #b91c1c88,0 0 45px #ffd84d,0 12px 32px #000b}
+.q-bomb-result-bubble small{display:block;margin-top:8px;font-size:clamp(15px,2.8vw,22px);font-weight:900}
+.q-bomb-result-bubble.show{animation:q-bomb-result-pop 1.7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes q-bomb-result-pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.35) rotate(-8deg)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.12) rotate(3deg)}23%{transform:translate(-50%,-50%) scale(.96) rotate(-1deg)}34%{transform:translate(-50%,-50%) scale(1) rotate(0)}78%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.2) rotate(3deg)}}
+
 @keyframes qBombPop{0%{transform:translateY(18px) scale(.65) rotate(-8deg);opacity:0}18%{transform:translateY(0) scale(1.12) rotate(3deg);opacity:1}35%{transform:scale(1) rotate(0);opacity:1}75%{transform:scale(1.04);opacity:1}100%{transform:scale(.75);opacity:0}}
 .fourstop-bubble{position:fixed;left:50%;top:24%;transform:translate(-50%,18px) scale(.75);opacity:0;pointer-events:none;z-index:5002;background:linear-gradient(135deg,#fff2a8,#ffbd45);color:#633600;border:3px solid #fff4c2;border-radius:22px;padding:16px 25px;font-size:clamp(22px,4vw,38px);font-weight:1000;box-shadow:0 8px 28px #0008;text-align:center;white-space:nowrap}
 .fourstop-bubble::after{content:"";position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);border-width:17px 14px 0;border-style:solid;border-color:#ffbd45 transparent transparent}
@@ -403,6 +408,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div id="revolutionBlackout" class="revolution-blackout" aria-hidden="true"></div><audio id="revolutionAudio" preload="auto"><source src="free_sound1055.mp3" type="audio/mpeg"></audio>
 <div id="revolutionOverlay" class="revolution-overlay" aria-hidden="true"><div class="revolution-rays"></div><div class="revolution-lights"></div><div class="revolution-balls" id="revolutionBalls"></div><div class="revolution-jackpot">SUPER JACKPOT</div><div class="revolution-title" id="revolutionTitle">革命！！</div></div>
 <div id="onlineEffectToast" class="online-effect-toast" aria-live="polite"></div>
+<div id="qBombResultBubble" class="q-bomb-result-bubble" aria-live="assertive"></div>
 
 <div class="online-modal" id="onlineModal" role="dialog" aria-modal="true" aria-labelledby="onlineTitle">
  <div class="online-box">
@@ -571,6 +577,23 @@ function log(s){
  d.textContent=s;
  el.prepend(d);
  while(el.children.length>25)el.lastChild.remove();
+}
+
+function showQBombResultBubble(rankLabel, destroyedCount=null){
+ const bubble=document.getElementById('qBombResultBubble');
+ if(!bubble)return;
+ bubble.replaceChildren();
+ const title=document.createElement('div');
+ title.textContent='Qボンバー！ '+rankLabel+'を破壊！';
+ bubble.append(title);
+ if(Number.isFinite(destroyedCount)){
+  const detail=document.createElement('small');
+  detail.textContent='破壊されたカード：'+destroyedCount+'枚';
+  bubble.append(detail);
+ }
+ bubble.classList.remove('show');
+ void bubble.offsetWidth;
+ bubble.classList.add('show');
 }
 
 function showFourStopBubble(){
@@ -1011,10 +1034,10 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
   return true;
  }
 
- const suppressEffects=(state.neutralizeCount||0)>0||state.neutralizeNext||state.jBackNineLock;
+ const suppressEffects=(state.neutralizeCount||0)>0||state.neutralizeNext||state.jBackNineLock||oldTable.some(c=>Number(c.rank)===9);
  if((state.neutralizeCount||0)>0)state.neutralizeCount--;
  state.neutralizeNext=false;
- if(suppressEffects)log(state.jBackNineLock?'Jバック＋9の封印により、このカードの特殊効果は無効':'9の効果により、このカードの能力は無効');
+ if(suppressEffects)log(oldTable.some(c=>Number(c.rank)===9)?'場に9があるため、このカードの特殊効果は無効（場が流れると解除）':state.jBackNineLock?'Jバック＋9の封印により、このカードの特殊効果は無効':'9の効果により、このカードの能力は無効');
 
  if(!suppressEffects){
   // 特殊効果は、実際に出した数字ごとに個別判定する。
@@ -1465,6 +1488,7 @@ function applyQ(rank,p){
   });
   tableBox.classList.remove('q-bomb-show');
   state.pendingQRemaining=Math.max(0,(state.pendingQRemaining||1)-1);
+  showQBombResultBubble(rankName(rank),destroyed);
   log('Qボンバー：'+rankName(rank)+'を'+destroyed+'枚破壊');
 
   if(p.hand.length===0)finishIfNeeded(p);
@@ -1781,7 +1805,7 @@ function ensureOnlineSocket(){
  onlineSocket.on('connect',()=>{if(onlineAuthToken)onlineSocket.emit('authResume',{token:onlineAuthToken},result=>{if(result?.ok){onlineAccount=result.account;renderAccountStatus();}else{onlineAuthToken='';localStorage.removeItem('daifugo2_auth_token');onlineAccount=null;renderAccountStatus(result?.message||'再ログインしてください。');}});});
  onlineSocket.on('connect_error',()=>{const err=document.getElementById('onlineError');if(err)err.textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
  onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
- onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}if((data.jBackSerial||0)>lastOnlineJBackSerial){lastOnlineJBackSerial=data.jBackSerial;showJJBubble();}if((data.revolutionSerial||0)>lastOnlineRevolutionSerial){lastOnlineRevolutionSerial=data.revolutionSerial;showRevolutionAnimation(!!data.revolution);}if((data.qBombSerial||0)>lastOnlineQBombSerial){lastOnlineQBombSerial=data.qBombSerial;showOnlineEffectToast('Qボンバー！ '+onlineRankName(data.qBombEvent?.rank));}if((data.spade3Serial||0)>lastOnlineSpade3Serial){lastOnlineSpade3Serial=data.spade3Serial;showSpade3Animation();}});
+ onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}if((data.jBackSerial||0)>lastOnlineJBackSerial){lastOnlineJBackSerial=data.jBackSerial;showJJBubble();}if((data.revolutionSerial||0)>lastOnlineRevolutionSerial){lastOnlineRevolutionSerial=data.revolutionSerial;showRevolutionAnimation(!!data.revolution);}if((data.qBombSerial||0)>lastOnlineQBombSerial){lastOnlineQBombSerial=data.qBombSerial;showQBombResultBubble(onlineRankName(data.qBombEvent?.rank));}if((data.spade3Serial||0)>lastOnlineSpade3Serial){lastOnlineSpade3Serial=data.spade3Serial;showSpade3Animation();}});
  onlineSocket.on('onlineActionError',msg=>{document.getElementById('onlineGameStatus').textContent=msg;});
  onlineSocket.on('roomClosed',message=>{document.getElementById('onlineError').textContent=message||'ルームが終了しました。';resetOnlineLobby();});
  return onlineSocket;
