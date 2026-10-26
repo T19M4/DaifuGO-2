@@ -547,7 +547,7 @@ function newGame(){
  shuffled(deck);
 
  let players=[
-  {name:(onlineAccount?.username||'あなた'),hand:[],human:true,finished:false,status:''},
+  {name:(onlineAccount?.username||'ゲスト'),hand:[],human:true,finished:false,status:''},
   {name:'CPU 1',hand:[],finished:false,status:''},
   {name:'CPU 2',hand:[],finished:false,status:''},
   {name:'CPU 3',hand:[],finished:false,status:''}
@@ -663,9 +663,11 @@ function offlinePlaceLabel(player){
 
 function render(){
  if(!state)return;
+ // オフライン対戦の人間プレイヤー名は、現在ログイン中のアカウント名に同期する。
+ if(state.players?.[0]?.human)state.players[0].name=onlineAccount?.username||'ゲスト';
  const handHeading=document.getElementById('humanHandHeading');
- if(handHeading)handHeading.textContent=(onlineAccount?.username||state.players?.[0]?.name||'あなた')+'の手札';
- document.getElementById('turnLabel').textContent=current().name+(state.turn===0&&!onlineAccount?'（あなた）':'');
+ if(handHeading)handHeading.textContent=(onlineAccount?.username||state.players?.[0]?.name||'ゲスト')+'の手札';
+ document.getElementById('turnLabel').textContent=current().name;
  document.getElementById('fieldLabel').textContent=state.table.length?state.table.length+'枚出し':'場にカードはありません';
  document.getElementById('gameLabel').textContent=state.finished?'ゲーム終了':'プレイ中';
  document.getElementById('deckCount').textContent='残り '+state.deck.length+' 枚';
@@ -1816,7 +1818,7 @@ function ensureOnlineSocket(){
  if(onlineSocket)return onlineSocket;
  if(typeof io!=='function')return null;
  onlineSocket=io(ONLINE_SERVER_URL,{transports:['websocket','polling']});
- onlineSocket.on('connect',()=>{if(onlineAuthToken)onlineSocket.emit('authResume',{token:onlineAuthToken},result=>{if(result?.ok){onlineAccount=result.account;renderAccountStatus();}else{onlineAuthToken='';localStorage.removeItem('daifugo2_auth_token');onlineAccount=null;renderAccountStatus(result?.message||'再ログインしてください。');}});});
+ onlineSocket.on('connect',()=>{if(onlineAuthToken)onlineSocket.emit('authResume',{token:onlineAuthToken},result=>{if(result?.ok){onlineAccount=result.account;renderAccountStatus();if(state)render();}else{onlineAuthToken='';localStorage.removeItem('daifugo2_auth_token');onlineAccount=null;renderAccountStatus(result?.message||'再ログインしてください。');if(state)render();}});});
  onlineSocket.on('connect_error',()=>{const err=document.getElementById('onlineError');if(err)err.textContent='サーバーに接続できません。Renderの稼働状態を確認してください。';});
  onlineSocket.on('playersUpdated',players=>renderOnlinePlayers(players));
  onlineSocket.on('onlineGameState',data=>{onlineGameData=data;renderOnlineGame(data);if((data.playEffectSerial||0)>lastOnlinePlayEffectSerial){lastOnlinePlayEffectSerial=data.playEffectSerial;const event=data.playEffectEvent;if(event?.effect)showFinishEffect(event.effect);}if((data.fourStopSerial||0)>lastOnlineFourStopSerial){lastOnlineFourStopSerial=data.fourStopSerial;showFourStopBubble();}if((data.jBackSerial||0)>lastOnlineJBackSerial){lastOnlineJBackSerial=data.jBackSerial;showJJBubble();}if((data.revolutionSerial||0)>lastOnlineRevolutionSerial){lastOnlineRevolutionSerial=data.revolutionSerial;showRevolutionAnimation(!!data.revolution);}if((data.qBombSerial||0)>lastOnlineQBombSerial){lastOnlineQBombSerial=data.qBombSerial;showQBombResultBubble(onlineRankName(data.qBombEvent?.rank));}if((data.spade3Serial||0)>lastOnlineSpade3Serial){lastOnlineSpade3Serial=data.spade3Serial;showSpade3Animation();}if((data.jokerSerial||0)>lastOnlineJokerSerial){lastOnlineJokerSerial=data.jokerSerial;showOnlineEffectToast('🃏 JOKER！');}if((data.giveEventSerial||0)>lastOnlineGiveSerial){lastOnlineGiveSerial=data.giveEventSerial;showOnlineEffectToast('🎁 7渡し！');}});
@@ -1861,7 +1863,7 @@ function renderAccountStatus(message=''){
  }
  if(document.getElementById('gachaRpView'))updateGachaProfileViews();if(document.getElementById('loginBonusModal')?.classList.contains('open'))renderLoginBonus();
 }
-function authRequest(eventName){if(eventName==='authRegister'){const username=document.getElementById('accountUsername').value.trim();if(forbiddenOnlineName(username)){document.getElementById('accountStatus').textContent='このユーザー名は使用できません。禁止ワードが含まれています。';return;}}if(!onlineSocket){openOnlineModal();}if(!onlineSocket||!onlineSocket.connected){document.getElementById('accountStatus').textContent='サーバーに接続してから操作してください。';return;}const username=document.getElementById('accountUsername').value.trim(),password=document.getElementById('accountPassword').value;onlineSocket.emit(eventName,{username,password},result=>{if(!result?.ok){document.getElementById('accountStatus').textContent=result?.message||'認証に失敗しました。';return;}onlineAuthToken=result.token;onlineAccount=result.account;localStorage.setItem('daifugo2_auth_token',onlineAuthToken);document.getElementById('accountPassword').value='';renderAccountStatus();});}
+function authRequest(eventName){if(eventName==='authRegister'){const username=document.getElementById('accountUsername').value.trim();if(forbiddenOnlineName(username)){document.getElementById('accountStatus').textContent='このユーザー名は使用できません。禁止ワードが含まれています。';return;}}if(!onlineSocket){openOnlineModal();}if(!onlineSocket||!onlineSocket.connected){document.getElementById('accountStatus').textContent='サーバーに接続してから操作してください。';return;}const username=document.getElementById('accountUsername').value.trim(),password=document.getElementById('accountPassword').value;onlineSocket.emit(eventName,{username,password},result=>{if(!result?.ok){document.getElementById('accountStatus').textContent=result?.message||'認証に失敗しました。';return;}onlineAuthToken=result.token;onlineAccount=result.account;localStorage.setItem('daifugo2_auth_token',onlineAuthToken);document.getElementById('accountPassword').value='';renderAccountStatus();if(state)render();});}
 document.getElementById('registerAccountBtn').addEventListener('click',()=>authRequest('authRegister'));
 document.getElementById('loginAccountBtn').addEventListener('click',()=>authRequest('authLogin'));
 let googleClientId='';
