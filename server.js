@@ -189,7 +189,7 @@ function canBeat(cards,g){
   return !g.jBackNineLock && !g.table.some(c=>c.rank===9) && !(g.trickHistory||[]).some(x=>(x.cards||[]).some(c=>Number(c.rank)===9)) && cards.length===1 && cards[0].rank===3 && cards[0].suit==='♠';
  }
  // 8切りに対する4止め：4を2枚、または4＋ジョーカーのみ。
- if(g.eightPending&&g.table.some(c=>c.rank===8))return cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));
+ if(g.eightPending&&g.table.some(c=>c.rank===8)){const nineUnder=(g.trickHistory||[]).some(x=>(x.cards||[]).some(c=>Number(c.rank)===9));return !nineUnder&&cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));}
  if(cards.length!==g.table.length)return false;
  const playedStair=stairRanks(cards),tableStair=stairRanks(g.table);
  if(playedStair&&tableStair)return power(playedStair[playedStair.length-1],g)>power(tableStair[tableStair.length-1],g);
@@ -288,7 +288,9 @@ function doPlay(code,playerId,ids){
  const orderedIds=Array.isArray(ids)?ids:[];const wanted=new Set(orderedIds);const cards=orderedIds.map(id=>p.hand.find(c=>c.id===id)).filter(Boolean);
  if(cards.length!==wanted.size||!cards.length||!canBeat(cards,g)){io.to(playerId).emit('onlineActionError','そのカードは出せません。');return;}
  const oldTable=g.table.slice(),wasOccupied=oldTable.length>0;
- const fourStop=g.eightPending&&oldTable.some(c=>c.rank===8)&&cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));
+ const nineUnderInTrick=(g.trickHistory||[]).some(x=>(x.cards||[]).some(c=>Number(c.rank)===9));
+ const fourStop=g.eightPending&&oldTable.some(c=>c.rank===8)&&!nineUnderInTrick&&cards.length===2&&(cards.every(c=>c.rank===4)||(cards.some(c=>c.rank===4)&&cards.some(c=>c.rank===16)));
+ const suppressByNine=oldTable.some(c=>Number(c.rank)===9)||nineUnderInTrick;
  const qToJBack=oldTable.length===1&&cards.length===1&&oldTable[0].rank===12&&cards[0].rank===11&&cards[0].suit===oldTable[0].suit;
  const down=!qToJBack&&oldTable.length===1&&cards.length===1&&cards[0].rank!==16&&oldTable[0].rank!==16&&cards[0].suit===oldTable[0].suit&&Math.abs(cards[0].rank-oldTable[0].rank)===1;
  const oldLock=g.lockSuit,selectedStairRanks=stairRanks(cards),effectiveRanks=selectedStairRanks||cards.map(c=>c.rank),jPlayedEarlier=g.trickHistory.some(x=>(x.effectiveRanks||x.cards.map(c=>c.rank)).includes(11));
@@ -300,7 +302,7 @@ function doPlay(code,playerId,ids){
  if(wasOccupied&&oldTable.length&&cards.every(c=>c.suit&&c.suit===cards[0].suit)&&oldTable.every(c=>c.suit&&c.suit===oldTable[0].suit)&&cards[0].suit===oldTable[0].suit)g.lockSuit=cards[0].suit;else if(!wasOccupied)g.lockSuit=null;else g.lockSuit=oldLock&&cards.every(c=>c.suit===oldLock)?oldLock:null;
  addLog(g,`${p.name}：${cards.map(cardText).join(' ')}`);if(qToJBack)addLog(g,'QのあとにJ：ダウンナンバーを解除し、Jバックを発動します。');else if(down)addLog(g,'ダウンナンバー！');
  if(!g.jBackNineLock&&g.jBack&&jPlayedEarlier&&effectiveRanks.includes(9)){g.jBackNineLock=true;addLog(g,'Jバック＋9：Jバックは維持。以降の特殊効果を場が流れるまで封印。');}
- let skip=0;const suppress=g.neutralizeCount>0||g.jBackNineLock;if(g.neutralizeCount>0)g.neutralizeCount--;
+ let skip=0;const suppress=g.neutralizeCount>0||g.jBackNineLock||suppressByNine;if(g.neutralizeCount>0)g.neutralizeCount--;
  if(fourStop){g.effects.push('4止め');g.fourStopSerial=(g.fourStopSerial||0)+1;addLog(g,`止め価値あり！ ${p.name}が4止め！場を流し、${p.name}から再開します。`);if(finishCheck(g,p)){emitGame(code);return;}clearTrick(g,g.turn);g.notice='止め価値あり！ '+p.name+'から再開します。';emitGame(code);if(g.players[g.turn]?.isCPU)setTimeout(()=>cpuTurn(code),900);return;}
  g.pendingActions=[];g.pendingActor=g.turn;g.pendingSkip=0;
  if(!suppress){
