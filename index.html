@@ -784,7 +784,7 @@ function canBeat(cards,ignoreDownNumber=false){
 
  // 8切り待機中は、他プレイヤーが出せるのは4の2枚、または4＋ジョーカーだけ。
  // それ以外のカードで8切りを上書きすることはできない。
- if(state.eightCutPending&&state.table.some(c=>c.rank===8))return !state.table.some(c=>c.rank===9)&&isFourStopPair(cards);
+ if(state.eightCutPending&&state.table.some(c=>c.rank===8))return !state.table.some(c=>c.rank===9)&&!(state.trickCards||[]).some(entry=>(entry.cards||[]).some(c=>Number(c.rank)===9))&&isFourStopPair(cards);
 
  if(cards.length!==state.table.length)return false;
  const playedStair=stairRanks(cards),tableStair=stairRanks(state.table);
@@ -975,7 +975,7 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
  const selectedStairRanks=stairRanks(cards);
 
  const wasFirstMove=state.firstMove;
- const fourStop=state.eightCutPending&&state.table.some(c=>c.rank===8)&&!state.table.some(c=>c.rank===9)&&isFourStopPair(cards);
+ const fourStop=state.eightCutPending&&state.table.some(c=>c.rank===8)&&!state.table.some(c=>c.rank===9)&&!(state.trickCards||[]).slice(0,-1).some(entry=>(entry.cards||[]).some(c=>Number(c.rank)===9))&&isFourStopPair(cards);
  const spadeThreeReversal=!state.jBackNineLock&&state.table.some(c=>c.rank===16)&&!state.table.some(c=>c.rank===9)&&cards.length===1&&cards[0].rank===3&&cards[0].suit==='♠';
  const oldTable=state.table.slice();
 
@@ -1042,7 +1042,8 @@ function playCards(cards,byCpu=false,downNumberChoice=null){
   return true;
  }
 
- const suppressEffects=(state.neutralizeCount||0)>0||state.neutralizeNext||state.jBackNineLock||oldTable.some(c=>Number(c.rank)===9);
+ const nineUnderInTrick=(state.trickCards||[]).slice(0,-1).some(entry=>(entry.cards||[]).some(c=>Number(c.rank)===9));
+ const suppressEffects=(state.neutralizeCount||0)>0||state.neutralizeNext||state.jBackNineLock||oldTable.some(c=>Number(c.rank)===9)||nineUnderInTrick;
  if((state.neutralizeCount||0)>0)state.neutralizeCount--;
  state.neutralizeNext=false;
  if(suppressEffects)log(oldTable.some(c=>Number(c.rank)===9)?'場に9があるため、このカードの特殊効果は無効（場が流れると解除）':state.jBackNineLock?'Jバック＋9の封印により、このカードの特殊効果は無効':'9の効果により、このカードの能力は無効');
