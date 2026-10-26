@@ -317,7 +317,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 <div class="hand-area">
 <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
-<strong>あなたの手札</strong>
+<strong id="humanHandHeading">あなたの手札</strong>
 <span class="subtle" id="handCount">0枚</span>
 </div>
 <div class="hand" id="hand"></div>
@@ -396,7 +396,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <button type="button" id="qConfirm" disabled>宣言する</button>
 </div>
 <div class="q-hand" id="qHandPreview">
-<strong>あなたの手札</strong>
+<strong id="humanHandHeading">あなたの手札</strong>
 <div class="q-hand-cards" id="qHandCards"></div>
 </div>
 </div>
@@ -547,7 +547,7 @@ function newGame(){
  shuffled(deck);
 
  let players=[
-  {name:'あなた',hand:[],human:true,finished:false,status:''},
+  {name:(onlineAccount?.username||'あなた'),hand:[],human:true,finished:false,status:''},
   {name:'CPU 1',hand:[],finished:false,status:''},
   {name:'CPU 2',hand:[],finished:false,status:''},
   {name:'CPU 3',hand:[],finished:false,status:''}
@@ -663,7 +663,9 @@ function offlinePlaceLabel(player){
 
 function render(){
  if(!state)return;
- document.getElementById('turnLabel').textContent=current().name+(state.turn===0?'（あなた）':'');
+ const handHeading=document.getElementById('humanHandHeading');
+ if(handHeading)handHeading.textContent=(onlineAccount?.username||state.players?.[0]?.name||'あなた')+'の手札';
+ document.getElementById('turnLabel').textContent=current().name+(state.turn===0&&!onlineAccount?'（あなた）':'');
  document.getElementById('fieldLabel').textContent=state.table.length?state.table.length+'枚出し':'場にカードはありません';
  document.getElementById('gameLabel').textContent=state.finished?'ゲーム終了':'プレイ中';
  document.getElementById('deckCount').textContent='残り '+state.deck.length+' 枚';
@@ -1900,7 +1902,7 @@ function loadLeaderboard(){
 
 document.getElementById('saveEffectBtn').addEventListener('click',()=>{if(!onlineAccount||!onlineSocket?.connected)return;onlineSocket.emit('setSelectedEffect',{effect:document.getElementById('profileEffectSelect').value},result=>{if(!result?.ok){document.getElementById('profileStatus').textContent=result?.message||'エフェクトを設定できませんでした。';return;}onlineAccount=result.account;renderAccountStatus();updateGachaProfileViews();document.getElementById('profileStatus').textContent='上がりエフェクトを保存しました。アカウントに紐づけて保存されます。';});});
 const LOGIN_BONUS_REWARDS=[['初ログイン','通常称号「初ログイン」'],['常連への道','通常称号「常連」'],['大富豪見習い','通常称号「大富豪見習い」'],['カードコレクター','通常称号「カードコレクター」'],['称号コレクター','限定称号「毎日革命」'],['継続の証','通常称号「継続中」'],['7日間達成','CLEAN FINISH エフェクト解放'],['革命の予感','通常称号「革命の予感」'],['カードマスター','通常称号「カードマスター」'],['大富豪研究家','通常称号「大富豪研究家」'],['伝説の始まり','通常称号「伝説の始まり」'],['ジョーカーコレクター','通常称号「ジョーカーコレクター」'],['革命の支配者','通常称号「革命の支配者」'],['エフェクト解放','GOLDEN SEVEN エフェクト解放'],['皆勤への道','通常称号「皆勤への道」'],['大富豪の極意','通常称号「大富豪の極意」'],['上がりの達人','通常称号「上がりの達人」'],['勝負師','通常称号「勝負師」'],['称号マニア','通常称号「称号マニア」'],['最後の試練','限定称号「最後の試練」'],['3週間達成','MYSTIC JOKER エフェクト解放']];
-function renderLoginBonus(){const status=document.getElementById('loginBonusStatus'),progress=document.getElementById('loginBonusProgress'),list=document.getElementById('loginBonusRewards'),claim=document.getElementById('claimLoginBonusBtn');list.innerHTML='';if(!onlineAccount){status.textContent='ログインが必要です。オンラインモードからログインしてください。';progress.textContent='';claim.disabled=true;}else{const b=onlineAccount.loginBonus||{};const day=Math.min(21,Number(b.day)||0);status.textContent=b.claimedToday?'今日は受取済みです。明日また受け取れます。':'今日の報酬を受け取れます。';progress.textContent=`進捗：${day}/21日　連続ログイン日数`;claim.disabled=!!b.claimedToday;LOGIN_BONUS_REWARDS.forEach((r,i)=>{const row=document.createElement('div');row.style.cssText='padding:7px 3px;border-bottom:1px solid #31574f';row.textContent=`${i+1}日目：${r[0]} — ${r[1]}${i<day?' ✓':i===day?' ← 次の報酬':''}`;list.append(row);});} }
+function renderLoginBonus(){const status=document.getElementById('loginBonusStatus'),progress=document.getElementById('loginBonusProgress'),list=document.getElementById('loginBonusRewards'),claim=document.getElementById('claimLoginBonusBtn');list.innerHTML='';if(!onlineAccount){status.textContent='ログインが必要です。オンラインモードからログインしてください。';progress.textContent='';claim.disabled=true;}else{const b=onlineAccount.loginBonus||{};const day=Math.min(21,Number(b.day)||0);status.textContent=b.claimedToday?'今日は受取済みです。':'今日の報酬を受け取れます。連続ログインは不要です。';progress.textContent=`進捗：${day}/21回　受取回数（ログイン間隔は問いません）`;claim.disabled=!!b.claimedToday;LOGIN_BONUS_REWARDS.forEach((r,i)=>{const row=document.createElement('div');row.style.cssText='padding:7px 3px;border-bottom:1px solid #31574f';row.textContent=`報酬${i+1}：${r[0]} — ${r[1]}${i<day?' ✓':i===day?' ← 次の報酬':''}`;list.append(row);});} }
 document.getElementById('openLoginBonusBtn').addEventListener('click',()=>{document.getElementById('loginBonusModal').classList.add('open');renderLoginBonus();});document.getElementById('closeLoginBonusBtn').addEventListener('click',()=>document.getElementById('loginBonusModal').classList.remove('open'));document.getElementById('loginBonusModal').addEventListener('click',e=>{if(e.target.id==='loginBonusModal')e.currentTarget.classList.remove('open');});document.getElementById('claimLoginBonusBtn').addEventListener('click',()=>{if(!onlineSocket?.connected){document.getElementById('loginBonusStatus').textContent='サーバーに接続してください。';return;}onlineSocket.emit('claimLoginBonus',{},result=>{if(!result?.ok){document.getElementById('loginBonusStatus').textContent=result?.message||'報酬を受け取れませんでした。';return;}onlineAccount=result.account;renderAccountStatus();updateGachaProfileViews();renderLoginBonus();document.getElementById('loginBonusStatus').textContent=result.message||'報酬を受け取りました！';});});
 document.getElementById('openLeaderboardBtn').addEventListener('click',()=>{document.getElementById('leaderboardModal').classList.add('open');loadLeaderboard();});
 document.getElementById('refreshLeaderboardBtn').addEventListener('click',loadLeaderboard);
