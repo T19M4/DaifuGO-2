@@ -512,20 +512,23 @@ io.on('connection',socket=>{
   const a=accountForSocket(socket);
   if(!a)return cb?.({ok:false,message:'CPU戦報酬を受け取るにはログインしてください。'});
   const firstPlace=payload.firstPlace===true;
+  a.games=(Number(a.games)||0)+1;
   if(firstPlace){
    a.cpuWinStreak=(Number(a.cpuWinStreak)||0)+1;
+   a.wins=(Number(a.wins)||0)+1;
    let reward=20; let message='CPU戦で1位！ +20 RP';
    if(a.cpuWinStreak===6){reward+=30;message+='、6連勝ボーナス +30 RP！';}
    if(a.cpuWinStreak===10){a.gachaTickets=(Number(a.gachaTickets)||0)+1;message+='、10連勝達成！ガチャチケットを1枚獲得！';}
    a.rp=(Number(a.rp)||0)+reward;
    a.cpuWins=(Number(a.cpuWins)||0)+1;
    message+=`（現在 ${a.cpuWinStreak} 連勝）`;
+   saveAccounts();
+   cb?.({ok:true,account:safeAccount(a),message});
   }else{
    a.cpuWinStreak=0;
-   return saveAccounts(),cb?.({ok:true,account:safeAccount(a),message:'CPU戦お疲れさまでした。連勝記録はリセットされました。'});
+   saveAccounts();
+   cb?.({ok:true,account:safeAccount(a),message:'CPU戦お疲れさまでした。連勝記録はリセットされました。'});
   }
-  saveAccounts();
-  cb?.({ok:true,account:safeAccount(a),message});
  });
  socket.on('rollTitleGacha',(payload={},cb)=>{const a=accountForSocket(socket);if(!a)return cb?.(authError('ガチャを回すにはログインしてください。'));const count=Number(payload.count),payment=payload.payment==='ticket'?'ticket':'rp';if(count!==1&&count!==10)return cb?.({ok:false,message:'1連または10連を選択してください。'});if(payment==='ticket'&&count!==1)return cb?.({ok:false,message:'ガチャチケットは1枚につき1連のみです。'});const cost=count===1?200:900;if(payment==='ticket'){if((Number(a.gachaTickets)||0)<1)return cb?.({ok:false,message:'ガチャチケットがありません。'});a.gachaTickets=(Number(a.gachaTickets)||0)-1;}else{if((a.rp||0)<cost)return cb?.({ok:false,message:`RPが足りません（必要：${cost} RP）。`});a.rp=(a.rp||0)-cost;}if(!Array.isArray(a.ownedTitles))a.ownedTitles=[];const results=[];for(let i=0;i<count;i++){const draw=drawTitle(),duplicate=a.ownedTitles.includes(draw.title);if(!duplicate)a.ownedTitles.push(draw.title);results.push({...draw,duplicate});}saveAccounts();cb?.({ok:true,spent:payment==='rp'?cost:0,payment,ticketsSpent:payment==='ticket'?1:0,results,account:safeAccount(a)});});
  socket.on('setSelectedTitle',(payload={},cb)=>{const a=accountForSocket(socket);if(!a)return cb?.(authError('称号を設定するにはログインしてください。'));const title=String(payload.title||'');if(title&&!(Array.isArray(a.ownedTitles)&&a.ownedTitles.includes(title)))return cb?.({ok:false,message:'その称号は所持していません。ガチャで獲得してください。'});a.selectedTitle=title;for(const [code,room] of rooms.entries()){let changed=false;for(const p of room.players){if(p.userId===a.id){p.title=title;changed=true;}}if(room.game){for(const gp of room.game.players){if(gp.userId===a.id){gp.title=title;changed=true;}}}if(changed){broadcastLobby(code);if(room.game)emitGame(code);}}saveAccounts();cb?.({ok:true,account:safeAccount(a)});});
